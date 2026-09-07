@@ -1,297 +1,263 @@
 # Lunar Image Registration
 
-A robust computer-vision framework for registering **Chandrayaan-2 optical lunar images** with corresponding **lunar reference images**. The system identifies reliable correspondence points between images acquired under different illumination, viewpoints, and spatial resolutions, and geometrically transforms the source image into the reference image's coordinate system.
+### Multi-modal, Sun-angle and Scale-invariant Image Correspondence for Chandrayaan-2 Optical Imagery
+
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green)](#license)
+[![Status](https://img.shields.io/badge/Status-In%20Development-orange)](#project-status)
 
 ## Overview
 
-**Image registration** is the process of aligning two or more images of the same scene into a common coordinate system.
+Lunar Image Registration is a research-oriented software system for automatically finding correspondences between lunar images acquired under different imaging conditions and registering them into a common coordinate system.
 
-In this project:
+The project is designed around **Chandrayaan-2 optical observations**, including:
 
-- **Source / Moving Image:** Chandrayaan-2 acquired optical image that is geometrically transformed.
-- **Reference / Fixed Image:** Lunar reference image used as the target coordinate system.
+- Orbiter High Resolution Camera (OHRC)
+- Terrain Mapping Camera-2 (TMC-2)
+- Imaging Infrared Spectrometer (IIRS)
 
-The primary objective is to develop a **generic software solution capable of producing accurate and spatially distributed correspondence points with sub-pixel registration accuracy**.
+and lunar reference imagery such as:
+
+- Lunar Reconnaissance Orbiter Narrow Angle Camera (LRO NAC)
+- SELENE/Kaguya imagery
+
+The system addresses three major challenges in lunar image correspondence:
+
+1. **Illumination variation** caused by changes in solar azimuth and elevation.
+2. **Viewpoint variation** caused by different camera positions and orientations.
+3. **Scale variation** caused by different spacecraft altitudes and sensor resolutions.
+
+The ultimate objective is to produce accurate, spatially distributed, potentially sub-pixel correspondences together with registered imagery and quantitative evaluation metrics.
 
 ---
 
 ## Problem Statement
 
-Registering lunar images is challenging because images of the same lunar region may be acquired:
+**SIH Problem Statement ID:** 26166
 
-- At different times
-- From different camera viewpoints
-- At different altitudes
-- At different spatial resolutions
-- Under significantly different illumination conditions
+**Title:** Multi-modal, Sun angle and scale invariant image correspondence using Chandrayaan-2 optical images (OHRC, TMC and IIRS)
 
-These differences make conventional feature matching unreliable and can introduce substantial geometric errors.
+**Organization:** Indian Space Research Organisation (ISRO)
 
-### Major Challenges
+**Category:** Software
 
-#### 1. Illumination Variation
-
-Changes in solar azimuth and elevation alter the shadows, brightness, and appearance of lunar surface features.
-
-A crater may therefore appear significantly different between two observations even though its physical location has not changed.
-
-#### 2. Viewpoint Variation
-
-Different camera positions and orientations introduce geometric distortions.
-
-Surface features can appear:
-
-- Translated
-- Rotated
-- Scaled
-- Perspective-distorted
-
-#### 3. Scale Variation
-
-Lunar missions can acquire imagery from vastly different orbital altitudes and with different imaging resolutions.
-
-Consequently, the same surface feature may occupy substantially different numbers of pixels in the two images.
-
-#### 4. Incorrect Correspondences
-
-Feature matching can produce false matches, particularly in repetitive or low-texture lunar terrain.
-
-Robust outlier rejection is therefore essential.
-
-#### 5. Sub-pixel Accuracy
-
-The final registered product should achieve correspondence accuracy below one pixel wherever the image quality and available information permit.
-
-#### 6. Spatial Distribution of Matches
-
-A large number of matches concentrated in one small region is not sufficient.
-
-The correspondence points should be distributed uniformly across the overlapping image area so that the estimated transformation remains stable.
+**Theme:** Space Technology
 
 ---
 
 ## Objectives
 
-The project aims to:
+The project aims to develop a generic software pipeline capable of:
 
-1. Automatically identify corresponding points between Chandrayaan-2 and reference lunar imagery.
-2. Handle illumination, viewpoint, and scale variations.
-3. Reject incorrect feature correspondences.
-4. Estimate an appropriate geometric transformation.
-5. Refine correspondence locations to achieve sub-pixel accuracy.
-6. Maintain a uniform spatial distribution of reliable match points.
-7. Generate a registered Chandrayaan-2 image.
-8. Provide the corresponding match-point dataset.
-9. Quantitatively evaluate registration quality.
+- Detecting reliable features in lunar imagery.
+- Finding correspondences between images acquired by different sensors or missions.
+- Handling changes in illumination and Sun angle.
+- Handling scale differences between datasets.
+- Handling viewpoint and geometric distortions.
+- Rejecting incorrect correspondences.
+- Maintaining a uniform spatial distribution of match points.
+- Estimating geometric transformations robustly.
+- Refining correspondences toward sub-pixel accuracy.
+- Producing registered images.
+- Providing quantitative registration metrics.
 
 ---
 
-## Proposed Pipeline
+## System Architecture
 
 ```text
-                 ┌──────────────────────┐
-                 │ Chandrayaan-2 Image  │
-                 │   Source / Moving    │
-                 └──────────┬───────────┘
-                            │
-                            ▼
-                 ┌──────────────────────┐
-                 │    Preprocessing     │
-                 │ Normalization/Noise │
-                 │     Reduction        │
-                 └──────────┬───────────┘
-                            │
-                            ▼
-                 ┌──────────────────────┐
-                 │ Multi-scale Feature │
-                 │     Extraction       │
-                 └──────────┬───────────┘
-                            │
-                            │
-        ┌───────────────────┘
-        │
-        ▼
-┌──────────────────────┐
-│ Reference Image      │
-│    Fixed Image       │
-└──────────┬───────────┘
-           │
-           ▼
-┌──────────────────────┐
-│ Feature Extraction   │
-└──────────┬───────────┘
-           │
-           └──────────────┐
-                          ▼
-                 ┌──────────────────────┐
-                 │ Feature / Descriptor │
-                 │      Matching        │
-                 └──────────┬───────────┘
-                            │
-                            ▼
-                 ┌──────────────────────┐
-                 │ Match Filtering      │
-                 │ Ratio + Mutual Test  │
-                 └──────────┬───────────┘
-                            │
-                            ▼
-                 ┌──────────────────────┐
-                 │ Robust Transformation│
-                 │       RANSAC         │
-                 └──────────┬───────────┘
-                            │
-                            ▼
-                 ┌──────────────────────┐
-                 │ Sub-pixel Refinement │
-                 └──────────┬───────────┘
-                            │
-                            ▼
-                 ┌──────────────────────┐
-                 │ Spatial Distribution │
-                 │    / Grid Sampling   │
-                 └──────────┬───────────┘
-                            │
-                ┌───────────┴────────────┐
-                ▼                        ▼
-       ┌─────────────────┐      ┌─────────────────┐
-       │ Registered Image│      │ Correspondence  │
-       │                 │      │     Points      │
-       └────────┬────────┘      └────────┬────────┘
-                │                        │
-                └────────────┬───────────┘
-                             ▼
-                    ┌──────────────────┐
-                    │    Evaluation    │
-                    │ RMSE / Inliers / │
-                    │  Inlier Ratio    │
-                    └──────────────────┘
+              Source Image                    Reference Image
+                   │                                │
+                   ▼                                ▼
+             Preprocessing                   Preprocessing
+                   │                                │
+                   └──────────────┬─────────────────┘
+                                  ▼
+                         Feature Extraction
+                                  │
+                                  ▼
+                             Matching
+                                  │
+                                  ▼
+                         Outlier Rejection
+                                  │
+                                  ▼
+                              RANSAC
+                                  │
+                                  ▼
+                       Transformation Model
+                                  │
+                                  ▼
+                        Sub-pixel Refinement
+                                  │
+                                  ▼
+                            Registration
+                                  │
+                   ┌──────────────┴──────────────┐
+                   ▼                             ▼
+             Registered Image              Match Points
+                   │                             │
+                   └──────────────┬──────────────┘
+                                  ▼
+                              Evaluation
+                                  │
+                    ┌─────────────┼─────────────┐
+                    ▼             ▼             ▼
+                   RMSE      Inlier Ratio    Match Count
 ```
 
 ---
 
-## Feature Matching
+## Methodology
 
-The framework can support multiple feature extraction and matching techniques.
+### 1. Preprocessing
 
-### Initial Baseline
+The input imagery is normalized before feature extraction.
 
-**SIFT (Scale-Invariant Feature Transform)** is recommended as the initial baseline because it provides robustness to:
+Potential preprocessing operations include:
 
-- Scale changes
-- Rotation
-- Moderate viewpoint changes
-- Local appearance variations
+- Grayscale conversion
+- Intensity normalization
+- Histogram equalization
+- CLAHE
+- Gamma correction
+- Gradient-based representations
+- Noise reduction
+- Resolution normalization
 
-### Potential Advanced Methods
-
-The framework can later evaluate:
-
-- ORB
-- SuperPoint
-- LoFTR
-- Other learned feature-matching architectures
-
-This allows the project to quantitatively compare classical and deep-learning-based approaches.
+The preprocessing stage will be evaluated experimentally to determine which representations provide the most reliable cross-illumination correspondence.
 
 ---
 
-## Geometric Registration
+### 2. Feature Extraction
 
-After obtaining candidate correspondences, robust geometric estimation is performed.
+The system is designed to support multiple feature extraction approaches.
 
-Depending on the characteristics of the image pair, possible transformation models include:
+#### Classical Baselines
+
+- SIFT
+- ORB
+
+#### Learned Features
+
+- SuperPoint
+- Other learned local feature methods
+
+#### Dense Correspondence
+
+- LoFTR
+
+The classical methods provide reproducible baselines against which learned approaches can be evaluated.
+
+---
+
+### 3. Feature Matching
+
+Detected features are matched between the source and reference images using descriptor-based or learned matching techniques.
+
+The pipeline may employ:
+
+- Nearest-neighbor matching
+- Ratio testing
+- Mutual/cross-check matching
+- Descriptor-distance filtering
+- Learned correspondence confidence
+
+---
+
+### 4. Outlier Rejection
+
+Raw correspondences contain incorrect matches.
+
+Robust geometric estimation is therefore applied using methods such as:
+
+- RANSAC
+- MAGSAC-style robust estimation
+- Reprojection-error filtering
+
+The resulting inlier set is used to estimate the final transformation.
+
+---
+
+### 5. Spatially Distributed Correspondences
+
+A major design requirement is to avoid concentrating all correspondences in a small portion of the image.
+
+The image can therefore be divided into spatial cells:
+
+```text
+┌─────┬─────┬─────┬─────┐
+│     │  ●  │     │ ●   │
+├─────┼─────┼─────┼─────┤
+│ ●   │     │ ●   │     │
+├─────┼─────┼─────┼─────┤
+│     │ ●   │     │ ●   │
+└─────┴─────┴─────┴─────┘
+```
+
+A controlled number of high-confidence correspondences can be selected from each region.
+
+This improves geometric stability and ensures that the transformation is supported across the image rather than by a single localized feature cluster.
+
+---
+
+### 6. Geometric Registration
+
+Depending on the imaging geometry, the system can estimate:
 
 - Translation
+- Similarity transformation
 - Affine transformation
 - Homography
-- Piecewise geometric transformation
-- More advanced non-rigid models where required
 
-RANSAC or another robust estimator is used to remove outlier correspondences.
-
-The transformation can be represented generally as:
-
-$$
-x_r = Hx_s
-$$
-
-where:
-
-- \(x_s\) = source-image coordinate
-- \(x_r\) = reference-image coordinate
-- \(H\) = estimated geometric transformation
-
-The simplest model capable of accurately representing the observed distortion should be preferred.
+The source image is then warped into the coordinate system of the reference image.
 
 ---
 
-## Sub-pixel Refinement
+### 7. Sub-pixel Refinement
 
-Initial feature matches generally provide pixel-level coordinates.
+After coarse correspondence estimation, local optimization can refine feature locations beyond integer-pixel precision.
 
-To improve registration accuracy, the selected correspondences can undergo local refinement using techniques such as:
-
-- Lucas-Kanade optimization
-- Local template matching
-- Phase correlation
-- Intensity-based optimization
-- Local optical-flow refinement
-- Least-squares optimization
-
-The final objective is to minimize the residual correspondence error and achieve **sub-pixel accuracy**.
-
----
-
-## Uniform Match Distribution
-
-To prevent matches from clustering in a small region, the overlapping image area can be divided into a grid.
-
-For example:
+Conceptually:
 
 ```text
-┌──────┬──────┬──────┬──────┐
-│  •   │      │  •   │      │
-├──────┼──────┼──────┼──────┤
-│      │  •   │      │  •   │
-├──────┼──────┼──────┼──────┤
-│  •   │      │  •   │      │
-├──────┼──────┼──────┼──────┤
-│      │  •   │      │  •   │
-└──────┴──────┴──────┴──────┘
+Detected point
+     │
+     ▼
+Coarse correspondence
+     │
+     ▼
+Local image patch
+     │
+     ▼
+Optimization
+     │
+     ▼
+Sub-pixel correspondence
 ```
 
-A fixed or adaptive number of high-quality correspondences can then be selected from each grid cell.
-
-This provides:
-
-- Better transformation stability
-- Better coverage
-- Reduced dependence on a single surface feature
-- More reliable registration across the entire image
+This stage is important for meeting the desired high-accuracy registration objective.
 
 ---
 
-## Evaluation Metrics
+## Evaluation
 
-The system should report multiple metrics rather than relying on a single accuracy measurement.
+The system will report quantitative metrics including:
 
-### Root Mean Square Error
+### RMSE
 
 $$
 RMSE =
 \sqrt{
 \frac{1}{N}
 \sum_{i=1}^{N}
-\left[
-(x_i-\hat{x}_i)^2+
-(y_i-\hat{y}_i)^2
-\right]
+\left\|p_i-\hat{p}_i\right\|^2
 }
 $$
 
 ### Inlier Count
 
-Number of correspondence points that remain consistent with the estimated geometric transformation.
+Number of correspondences satisfying the selected geometric error threshold.
 
 ### Inlier Ratio
 
@@ -302,101 +268,108 @@ $$
 
 ### Additional Metrics
 
-The framework can also report:
+The benchmark will also track:
 
-- Median reprojection error
-- 95th-percentile reprojection error
-- Maximum reprojection error
-- Number of valid correspondence points
+- Total keypoints
+- Raw matches
+- Filtered matches
+- Inlier matches
+- Reprojection error
 - Spatial coverage
-- Registration success rate
+- Registration error
 - Processing time
 
 ---
 
-## Expected Outputs
-
-For every successfully registered image pair, the system should produce:
-
-### 1. Registered Image
-
-The Chandrayaan-2 source image transformed into the reference image's coordinate system.
-
-### 2. Match Points
-
-A structured file containing corresponding coordinates:
-
-```text
-source_x, source_y, reference_x, reference_y, error, confidence
-```
-
-### 3. Transformation Parameters
-
-The estimated transformation matrix/model used for registration.
-
-### 4. Evaluation Report
-
-Example:
-
-```text
-Initial Matches       : 1842
-Filtered Matches      : 967
-RANSAC Inliers        : 812
-Inlier Ratio          : 83.97%
-RMSE                  : 0.42 px
-Median Error          : 0.28 px
-Spatial Coverage     : 91.4%
-```
-
----
-
-## Suggested Project Structure
+## Project Structure
 
 ```text
 lunar-image-registration/
 │
+├── configs/                 # Experiment configurations
 ├── data/
-│   ├── source/
-│   └── reference/
+│   ├── raw/                 # Original imagery
+│   ├── processed/           # Preprocessed data
+│   ├── patches/             # Image patches
+│   └── test/                # Test samples
+│
+├── notebooks/               # Research and experimentation
 │
 ├── src/
-│   ├── preprocessing/
-│   ├── features/
-│   ├── matching/
-│   ├── registration/
-│   ├── refinement/
-│   ├── distribution/
-│   └── evaluation/
+│   └── lunar_registration/
+│       ├── io/
+│       ├── preprocessing/
+│       ├── features/
+│       ├── matching/
+│       ├── geometry/
+│       ├── registration/
+│       ├── evaluation/
+│       └── utils/
 │
+├── scripts/                 # Dataset and experiment scripts
+├── tests/                   # Automated tests
 ├── outputs/
-│   ├── registered/
 │   ├── matches/
-│   └── reports/
+│   ├── registered/
+│   ├── metrics/
+│   └── figures/
 │
-├── tests/
-│
-├── configs/
+├── docs/                    # Technical documentation
 │
 ├── requirements.txt
-├── README.md
-└── main.py
+├── pyproject.toml
+└── README.md
 ```
 
 ---
 
-## Technology Stack
+## Installation
 
-The initial implementation can be developed using:
+Clone the repository:
 
-- **Python**
-- OpenCV
-- NumPy
-- SciPy
-- scikit-image
-- Matplotlib
-- PyTorch — for learned feature/matching models
+```bash
+git clone <repository-url>
+cd lunar-image-registration
+```
 
-Potential GPU acceleration can be introduced for deep-learning-based methods and large-scale image processing.
+Create a virtual environment:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## Basic Usage
+
+Run registration on an image pair:
+
+```bash
+python -m lunar_registration.cli register \
+    --source path/to/source.tif \
+    --reference path/to/reference.tif \
+    --config configs/default.yaml
+```
+
+Run evaluation:
+
+```bash
+python -m lunar_registration.cli evaluate \
+    --config configs/default.yaml
+```
+
+Run the complete benchmark:
+
+```bash
+python -m lunar_registration.cli benchmark
+```
 
 ---
 
@@ -404,115 +377,201 @@ Potential GPU acceleration can be introduced for deep-learning-based methods and
 
 ### Phase 1 — Baseline
 
-- Load source and reference images
-- Preprocess images
-- Implement SIFT feature extraction
-- Implement descriptor matching
-- Apply ratio-test filtering
-- Estimate homography using RANSAC
-- Generate registered image
+- [ ] Dataset ingestion
+- [ ] Image preprocessing
+- [ ] SIFT implementation
+- [ ] Descriptor matching
+- [ ] Ratio test
+- [ ] RANSAC
+- [ ] Homography estimation
+- [ ] Image registration
+- [ ] Match visualization
+- [ ] RMSE calculation
+- [ ] Inlier statistics
 
 ### Phase 2 — Robustness
 
-- Handle illumination variation
-- Introduce image pyramids
-- Improve outlier rejection
-- Implement spatially distributed matching
-- Add quantitative evaluation
+- [ ] Illumination normalization
+- [ ] Sun-angle robustness experiments
+- [ ] Scale robustness experiments
+- [ ] Viewpoint robustness experiments
+- [ ] Spatially distributed matching
+- [ ] Improved outlier rejection
 
-### Phase 3 — Sub-pixel Registration
+### Phase 3 — Learned Correspondence
 
-- Implement local correspondence refinement
-- Calculate sub-pixel residuals
-- Optimize transformation parameters
-- Validate accuracy on multiple image pairs
+- [ ] SuperPoint
+- [ ] Learned descriptor matching
+- [ ] LoFTR
+- [ ] Cross-sensor experiments
+- [ ] Comparative benchmark
 
-### Phase 4 — Advanced Matching
+### Phase 4 — High-Precision Registration
 
-Compare classical methods against learned approaches such as:
+- [ ] Sub-pixel refinement
+- [ ] Local optimization
+- [ ] Improved geometric models
+- [ ] Accuracy analysis
+
+### Phase 5 — Final System
+
+- [ ] End-to-end pipeline
+- [ ] Automated benchmarking
+- [ ] Result visualization
+- [ ] Reproducible experiments
+- [ ] Documentation
+- [ ] Software demonstration
+
+---
+
+## Experimental Design
+
+The project will evaluate the effect of:
+
+### Illumination
 
 ```text
-SIFT
-  ↓
-SuperPoint
-  ↓
-LoFTR
+Different Sun elevation
+Different Sun azimuth
+Different shadow conditions
+Different surface brightness
 ```
 
-Evaluate each method using the same dataset and metrics.
-
-### Phase 5 — Production Pipeline
-
-- Automated batch processing
-- Configuration-based execution
-- Visualization tools
-- Structured output generation
-- Evaluation reports
-- Error handling
-- Performance optimization
-
----
-
-## Visualization
-
-The system should provide visual diagnostics such as:
-
-### Match Visualization
+### Scale
 
 ```text
-SOURCE IMAGE                    REFERENCE IMAGE
-
-     •───────────────•
-       \             \
-        •───────────────•
-          \           /
-           •─────────•
+High resolution
+      ↕
+Medium resolution
+      ↕
+Low resolution
 ```
 
-### Registration Overlay
+### Viewpoint
 
-The registered source image can be overlaid with the reference image to visually identify:
+```text
+Translation
+Rotation
+Affine deformation
+Perspective deformation
+```
 
-- Correct alignment
-- Residual shifts
-- Local geometric distortions
-- Areas with poor registration
-
----
-
-## Success Criteria
-
-The proposed system will be considered successful if it can consistently:
-
-- Automatically register Chandrayaan-2 optical images against reference imagery.
-- Handle substantial illumination variation.
-- Handle scale and viewpoint differences.
-- Reject incorrect correspondences.
-- Produce spatially distributed reliable match points.
-- Achieve sub-pixel correspondence accuracy where feasible.
-- Generate a reproducible quantitative evaluation report.
-- Process multiple image pairs without manual intervention.
+Each experiment will compare correspondence quality using consistent evaluation metrics.
 
 ---
 
-## Future Extensions
+## Expected Output
 
-Potential future improvements include:
+For every source/reference image pair, the system should produce:
 
-- Digital Elevation Model (DEM)-assisted registration
-- Orthorectification
-- Physics-informed illumination normalization
-- Lunar terrain-aware feature extraction
-- GPU acceleration
-- Deep-learning-based correspondence estimation
-- Uncertainty estimation for individual match points
-- Automatic quality assessment
-- Large-scale Chandrayaan-2 image catalogue registration
+```text
+outputs/
+├── registered/
+│   └── registered_image.tif
+│
+├── matches/
+│   └── correspondences.png
+│
+└── metrics/
+    └── results.json
+```
+
+Example result:
+
+```json
+{
+  "keypoints_source": 1243,
+  "keypoints_reference": 1587,
+  "raw_matches": 842,
+  "inliers": 613,
+  "inlier_ratio": 0.728,
+  "rmse": 0.84,
+  "spatial_coverage": 0.91
+}
+```
+
+The numerical values above are illustrative output fields, not experimental results.
 
 ---
 
-## Project Goal
+## Data Sources
 
-The ultimate goal is to develop a **generic and extensible lunar image registration system** capable of reliably aligning Chandrayaan-2 optical imagery with lunar reference datasets despite differences in illumination, viewpoint, and scale.
+The problem statement identifies Chandrayaan-2 optical imagery including OHRC, TMC-2 and IIRS, with reference imagery from LRO NAC and SELENE.
 
-The system should provide not only a registered image, but also **high-quality, spatially distributed correspondence points and quantitative evidence of registration accuracy**, making the resulting products suitable for downstream lunar mapping, analysis, and scientific applications.
+Dataset access and availability will be incorporated once the official datasets are provided.
+
+Potential official sources include:
+
+- Chandrayaan-2 / Indian Space Science Data Centre
+- LRO NAC
+- SELENE/Kaguya
+
+Dataset licensing, access restrictions and metadata requirements will be documented before distributing any data with the repository.
+
+---
+
+## Research Direction
+
+The project is not intended to be merely an implementation of a single existing registration algorithm.
+
+The research direction is to investigate how lunar-specific factors affect image correspondence and develop a robust registration pipeline capable of handling:
+
+$$
+\boxed{
+Illumination +
+Scale +
+Viewpoint +
+Cross\text{-}modal\ differences
+}
+$$
+
+while maintaining:
+
+$$
+\boxed{
+High\ accuracy +
+Spatially\ distributed\ correspondences +
+Sub\text{-}pixel\ precision
+}
+$$
+
+The final system will be evaluated against classical and learned correspondence baselines.
+
+---
+
+## Reproducibility
+
+All experiments should be configuration-driven.
+
+Each experiment should record:
+
+```text
+Dataset
+Sensor
+Preprocessing
+Feature extractor
+Matcher
+RANSAC parameters
+Transformation model
+Refinement method
+Metrics
+Runtime
+```
+
+This allows experiments to be reproduced and compared systematically.
+
+---
+
+## License
+
+This project is intended for research and educational development.
+
+The final license will be selected after confirming the licensing requirements of the datasets, models and third-party libraries used by the project.
+
+---
+
+## Acknowledgements
+
+Developed as part of **Smart India Hackathon 2026** for the Indian Space Research Organisation (ISRO), Department of Space.
+
+**Problem Statement:** 26166
