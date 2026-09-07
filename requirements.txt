@@ -1,0 +1,7 @@
+numpy
+opencv-contrib-python
+Pillow
+matplotlib
+PyYAML
+pytest
+
