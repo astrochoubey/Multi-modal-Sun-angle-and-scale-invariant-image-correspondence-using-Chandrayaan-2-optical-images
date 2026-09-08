@@ -194,6 +194,30 @@ body.mission-control-theme {
   color: var(--neon-cyan);
 }
 
+.solace-core {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.18) 0%, rgba(0, 240, 255, 0.18) 60%, rgba(12, 16, 24, 0.95) 100%);
+  border: 1.5px solid var(--neon-cyan);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 20px var(--neon-cyan-glow), inset 0 0 10px rgba(245, 158, 11, 0.25);
+  transition: all 0.3s ease;
+}
+
+.solace-core:hover {
+  box-shadow: 0 0 28px var(--neon-cyan-glow), 0 0 16px rgba(245, 158, 11, 0.4);
+  transform: scale(1.05);
+}
+
+.solace-svg-logo {
+  width: 26px;
+  height: 26px;
+  filter: drop-shadow(0 0 4px rgba(0, 240, 255, 0.6));
+}
+
 .brand-text-block {
   display: flex;
   flex-direction: column;
@@ -219,6 +243,16 @@ body.mission-control-theme {
   color: var(--neon-blue);
 }
 
+.solace-badge-pill {
+  color: var(--amber-warm);
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+}
+
 .console-title {
   font-family: var(--font-display);
   font-size: 1.45rem;
@@ -227,6 +261,15 @@ body.mission-control-theme {
   background: linear-gradient(135deg, #ffffff 40%, var(--neon-blue) 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+}
+
+.solace-brand-name {
+  background: linear-gradient(135deg, var(--neon-cyan) 0%, #60A5FA 50%, var(--amber-warm) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  margin-right: 0.25rem;
 }
 
 /* Flight Telemetry Status Bar */

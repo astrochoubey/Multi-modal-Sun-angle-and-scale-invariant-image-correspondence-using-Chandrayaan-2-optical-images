@@ -212,47 +212,49 @@ def run_adaptive_command(args):
         apply_spatial_filter=args.spatial_filter,
     )
 
-    diag = result["diagnostics"]
+    if result.get("status") == "FAILED":
+        print(f"\n[REGISTRATION FAILED]: {result.get('reason', 'Unknown reason')}")
+        return
+
+    diag = result.get("pair_characteristics", {})
+    illum = diag.get("illumination", {})
+    scale = diag.get("scale", {})
+    src_tex = diag.get("source_texture", {})
+    ref_tex = diag.get("reference_texture", {})
+    relief = diag.get("terrain_relief_proxy", {})
+
     print("\n1. Image Pair Diagnostics:")
-    print(f"  - Texture Energy:       {diag['texture_energy_ratio']:.3f} (Entropy Src: {diag['entropy_source']:.2f}, Ref: {diag['entropy_reference']:.2f})")
-    print(f"  - Solar Azimuth Delta:  {diag['solar_azimuth_delta_deg']:.1f}°")
-    print(f"  - Relief Shadow Proxy:  {diag['relief_shadow_proxy']:.3f}")
-    print(f"  - Dynamic Range Ratio:  {diag['dynamic_range_ratio']:.3f}")
-    print(f"  - GSD Scale Ratio:      {diag['estimated_gsd_scale_ratio']:.2f}x")
+    print(f"  - Source Texture:       {src_tex.get('level', 'N/A')} (Entropy: {src_tex.get('shannon_entropy', 'N/A')}, Variance: {src_tex.get('spatial_variance', 'N/A')})")
+    print(f"  - Reference Texture:    {ref_tex.get('level', 'N/A')} (Entropy: {ref_tex.get('shannon_entropy', 'N/A')}, Variance: {ref_tex.get('spatial_variance', 'N/A')})")
+    print(f"  - Illumination Shift:   {illum.get('category', 'N/A')} (Bhattacharyya: {illum.get('bhattacharyya_distance', 'N/A')}, Shadow delta: {illum.get('shadow_disparity', 'N/A')})")
+    print(f"  - Relief Complexity:    {relief.get('combined_complexity', 'N/A')} (Mean edge density: {relief.get('mean_edge_density', 'N/A')})")
+    print(f"  - Spectral Scale Proxy: {scale.get('spectral_high_frequency_ratio', 'N/A')}")
 
-    strat = result["strategy"]
+    strat = result.get("strategy", {})
     print("\n2. Adaptive Strategy Selected:")
-    print(f"  - Representation:       {strat['representation']}")
-    print(f"  - Candidate Models:     {strat['candidate_models']}")
-    print(f"  - Piecewise Warp:       {strat['enable_piecewise']}")
-    print(f"  - Subpixel Refine:      {strat['enable_subpixel']}")
-    print(f"  - Spatial Regularize:   {strat['spatial_regularization']}")
+    print(f"  - Representation:       {strat.get('representation')}")
+    print(f"  - Feature Method:       {strat.get('feature_method')} (max {strat.get('sift_n_features')} features)")
+    print(f"  - Geometric Model:      {strat.get('geometric_model')}")
+    print(f"  - Piecewise Warp:       {strat.get('use_piecewise_refinement')}")
+    print(f"  - Rationale:            {strat.get('rationale')}")
 
-    reg = result["registration"]
     print("\n3. Registration Convergence:")
-    print(f"  - Inliers:              {reg['inliers']} / {reg['raw_matches']} ({reg['inlier_ratio']*100:.1f}%)")
-    print(f"  - Selected Model:       {reg['selected_model']}")
-    print(f"  - Inlier Reproj RMSE:   {reg['inlier_rmse_pixels']:.3f} px")
-    print(f"  - Global Check RMSE:    {reg['global_check_rmse_pixels']:.3f} px")
+    print(f"  - Inliers:              {result.get('inliers')} / {result.get('matches_count')} ({result.get('inlier_ratio', 0)*100:.1f}%)")
+    print(f"  - Selected Model:       {result.get('selected_model')}")
+    print(f"  - Inlier Reproj RMSE:   {result.get('rmse', 0):.3f} px")
+    print(f"  - Piecewise Engaged:    {result.get('piecewise_used')}")
 
-    subpx = result["subpixel"]
-    print("\n4. Sub-Pixel Precision Refinement:")
-    print(f"  - Enabled:              {subpx['enabled']}")
-    if subpx["enabled"]:
-        print(f"  - Mean Subpixel Offset: {subpx['mean_subpixel_offset_px']:.3f} px")
-        print(f"  - Refined Match Points: {subpx['refined_count']}")
+    conf = result.get("confidence", {})
+    print("\n4. Quality Assurance & Trustworthiness Score:")
+    print(f"  - Confidence Score:     {conf.get('confidence_score', 0):.4f} / 1.0000")
+    print(f"  - Classification:       {conf.get('category')}")
+    print(f"  - Trustworthy:          {conf.get('trustworthy')}")
+    print(f"  - Rationale:            {conf.get('rationale')}")
 
-    conf = result["confidence"]
-    print("\n5. Quality Assurance & Trustworthiness Score:")
-    print(f"  - Score:                {conf['confidence_score']:.4f} / 1.0000")
-    print(f"  - Classification:       {conf['category']}")
-    print(f"  - Trustworthy:          {conf['trustworthy']}")
-    print(f"  - Rationale:            {conf['rationale']}")
-
-    spatial = result["spatial_distribution"]
-    print("\n6. Spatial Match Regularization:")
-    print(f"  - Grid Coverage Ratio:  {spatial['spatial_coverage']*100:.1f}% of cells occupied")
-    print(f"  - Gini Concentration:   {spatial['gini_concentration_coefficient']:.3f} (0=uniform, 1=clustered)")
+    spatial = result.get("spatial_distribution", {})
+    print("\n5. Spatial Match Regularization:")
+    print(f"  - Grid Coverage Ratio:  {spatial.get('spatial_coverage', 0)*100:.1f}% of cells occupied")
+    print(f"  - Gini Concentration:   {spatial.get('gini_concentration_coefficient', 0):.3f} (0=uniform, 1=clustered)")
 
     print("\n" + "=" * 65)
     print(f"Outputs written to: {out_dir.resolve()}")

@@ -42,3 +42,6 @@ models/weights/*
 *.pth
 *.ckpt
 *.onnx
+
+# Editor / Session files
+*.ses

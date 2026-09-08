@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Chandrayaan-2 Lunar Optical Registration Console | ISRO Deep Space Mission Operations</title>
-  <meta name="description" content="Mission-grade Sun-angle and scale invariant image correspondence console for Chandrayaan-2 optical sensors (OHRC, TMC-2, IIRS).">
+  <title>SOLACE </title>
+  <meta name="description" content="SOLACE: Sun-Angle & Optical Lunar Adaptive Correspondence Engine for Chandrayaan-2 optical sensors (OHRC, TMC-2, IIRS).">
   
   <!-- Premium Fonts: Space Grotesk, Chakra Petch, Inter, JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -40,10 +40,19 @@
       
       <!-- Brand & Mission Badge -->
       <div class="mission-brand">
-        <div class="mission-crest-wrapper">
+        <div class="mission-crest-wrapper" data-tooltip="SOLACE · Sun-Angle & Optical Lunar Adaptive Correspondence Engine">
           <div class="radar-sweep-ring"></div>
-          <div class="crest-core">
-            <i data-lucide="orbit" class="crest-icon"></i>
+          <div class="crest-core solace-core">
+            <svg class="solace-svg-logo" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- Solar Corona Orbit Ring -->
+              <circle cx="16" cy="16" r="14" stroke="#F59E0B" stroke-width="1.2" stroke-dasharray="2 2.5" opacity="0.8"/>
+              <circle cx="16" cy="16" r="11" stroke="#00F0FF" stroke-width="1.2"/>
+              <!-- Lunar Crescent intersecting Sol -->
+              <path d="M16 6C10.477 6 6 10.477 6 16C6 21.523 10.477 26 16 26C13.2 23.5 11.5 19.9 11.5 16C11.5 12.1 13.2 8.5 16 6Z" fill="#00F0FF"/>
+              <!-- Central Optical Invariant Keypoint Star -->
+              <path d="M16 9.5L17.8 14.2L22.5 16L17.8 17.8L16 22.5L14.2 17.8L9.5 16L14.2 14.2L16 9.5Z" fill="#FFFFFF"/>
+              <circle cx="16" cy="16" r="1.8" fill="#0C1018"/>
+            </svg>
           </div>
         </div>
 
@@ -51,11 +60,11 @@
           <div class="sub-agency-tag">
             <span class="agency-callsign">ISRO // DEEP SPACE NETWORK</span>
             <span class="separator-bullet">/</span>
-            <span class="payload-tag">CHANDRAYAAN-2 OPTICAL PAYLOAD</span>
+            <span class="payload-tag">CHANDRAYAAN-2 OPTICAL</span>
             <span class="separator-bullet">/</span>
-            <span class="polar-tag">100 KM POLAR ORBIT</span>
+            <span class="solace-badge-pill">SOLACE</span>
           </div>
-          <h1 class="console-title">Lunar Surface Registration Console</h1>
+          <h1 class="console-title"><span class="solace-brand-name">SOLACE</span> Lunar Registration Console</h1>
         </div>
       </div>
 
