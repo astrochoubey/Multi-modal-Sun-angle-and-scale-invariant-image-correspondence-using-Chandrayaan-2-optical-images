@@ -8,7 +8,7 @@
 [![Domain](https://img.shields.io/badge/Domain-Lunar%20Computer%20Vision-purple)](#-research-direction)
 [![SIH](https://img.shields.io/badge/Smart%20India%20Hackathon-2026-blueviolet)](#-acknowledgements)
 
-> **Research principle:** Don't assume that two lunar images should have similar pixels.
+> **Research principle:** We don't assume that two lunar images should have similar pixels.
 > Instead, identify and match the **terrain structure** that stays useful when illumination,
 > scale, viewpoint, and sensor characteristics change.
 
@@ -54,11 +54,11 @@ system.
 The target use case is cross-sensor and cross-mission lunar imagery, including
 Chandrayaan-2 observations such as:
 
-| Sensor | Instrument | Resolution | Notes |
-|---|---|---|---|
-| 🛰️ **OHRC** | Orbiter High Resolution Camera | 0.25–0.32 m/px | Very high-resolution panchromatic, designed for low Sun-elevation imaging |
-| 🛰️ **TMC-2** | Terrain Mapping Camera-2 | ~5 m/px | Panchromatic, stereo triplets (fore/nadir/aft) |
-| 🛰️ **IIRS** | Imaging Infrared Spectrometer | — | Hyperspectral/mineralogical mapping |
+| Sensor       | Instrument                     | Resolution     | Notes                                                                     |
+| ------------ | ------------------------------ | -------------- | ------------------------------------------------------------------------- |
+| 🛰️ **OHRC**  | Orbiter High Resolution Camera | 0.25–0.32 m/px | Very high-resolution panchromatic, designed for low Sun-elevation imaging |
+| 🛰️ **TMC-2** | Terrain Mapping Camera-2       | ~5 m/px        | Panchromatic, stereo triplets (fore/nadir/aft)                            |
+| 🛰️ **IIRS**  | Imaging Infrared Spectrometer  | —              | Hyperspectral/mineralogical mapping                                       |
 
 and reference imagery such as:
 
@@ -87,13 +87,13 @@ challenges.
 
 ## 🎯 Problem Statement
 
-| | |
-|---|---|
-| **SIH Problem Statement ID** | 26166 |
-| **Title** | *Multi-modal, Sun angle and scale invariant image correspondence using Chandrayaan-2 optical images (OHRC, TMC and IIRS)* |
-| **Organization** | Indian Space Research Organisation (ISRO) |
-| **Category** | Software |
-| **Theme** | Space Technology |
+|                              |                                                                                                                           |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **SIH Problem Statement ID** | 26166                                                                                                                     |
+| **Title**                    | _Multi-modal, Sun angle and scale invariant image correspondence using Chandrayaan-2 optical images (OHRC, TMC and IIRS)_ |
+| **Organization**             | Indian Space Research Organisation (ISRO)                                                                                 |
+| **Category**                 | Software                                                                                                                  |
+| **Theme**                    | Space Technology                                                                                                          |
 
 The problem is fundamentally an **image correspondence and registration problem**:
 
@@ -127,7 +127,7 @@ Our research question is more specific to the Moon:
 > we make registration more robust by explicitly representing and selecting stable terrain
 > structure?**
 
-Instead of asking only *"do these pixels look similar?"*, we ask:
+Instead of asking only _"do these pixels look similar?"_, we ask:
 
 > **"Does the underlying terrain structure look similar?"**
 
@@ -241,7 +241,7 @@ while a smooth mare region contains little repeatable texture. Useful signals: g
 density, local variance, edge density, keypoint density.
 
 **Illumination difference.** Compared via intensity distributions, local contrast, gradient
-statistics, and shadow/bright-region statistics. The purpose is *not* to claim exact
+statistics, and shadow/bright-region statistics. The purpose is _not_ to claim exact
 physical illumination recovery unless Sun geometry and photometric calibration are
 available.
 
@@ -257,17 +257,17 @@ distribution, and spatial consistency to judge whether a single global model is 
 
 The key idea is to create several views of the same terrain:
 
-| Representation | Purpose |
-|---|---|
-| **Raw grayscale** | Baseline representation |
-| **CLAHE** | Local contrast enhancement — useful when global brightness differences hide local terrain structure |
-| **Gradient magnitude** | Highlights rapid spatial intensity changes: crater rims, scarps, ridges, boundaries |
-| **Edge map** | Focuses on structural boundaries rather than absolute intensity |
-| **Laplacian** | Emphasizes second-order intensity changes and fine structure (can amplify noise) |
-| **Local contrast** | Compares a pixel/patch to its local neighborhood rather than absolute brightness |
-| **Phase congruency** | Emphasizes significant local phase relationships rather than raw intensity magnitude — of particular interest since recent planetary-registration work has explored multi-scale phase-congruency representations under changing illumination [3] |
-| **Shadow suppression** | Experimental preprocessing to reduce the effect of illumination/shadow regions — aggressive removal can also destroy useful terrain boundaries |
-| **Multi-scale representations** | Large-scale terrain structure (e.g. crater basins) vs. fine-scale structure (small craters); both are useful but behave differently as resolution changes |
+| Representation                  | Purpose                                                                                                                                                                                                                                          |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Raw grayscale**               | Baseline representation                                                                                                                                                                                                                          |
+| **CLAHE**                       | Local contrast enhancement — useful when global brightness differences hide local terrain structure                                                                                                                                              |
+| **Gradient magnitude**          | Highlights rapid spatial intensity changes: crater rims, scarps, ridges, boundaries                                                                                                                                                              |
+| **Edge map**                    | Focuses on structural boundaries rather than absolute intensity                                                                                                                                                                                  |
+| **Laplacian**                   | Emphasizes second-order intensity changes and fine structure (can amplify noise)                                                                                                                                                                 |
+| **Local contrast**              | Compares a pixel/patch to its local neighborhood rather than absolute brightness                                                                                                                                                                 |
+| **Phase congruency**            | Emphasizes significant local phase relationships rather than raw intensity magnitude — of particular interest since recent planetary-registration work has explored multi-scale phase-congruency representations under changing illumination [3] |
+| **Shadow suppression**          | Experimental preprocessing to reduce the effect of illumination/shadow regions — aggressive removal can also destroy useful terrain boundaries                                                                                                   |
+| **Multi-scale representations** | Large-scale terrain structure (e.g. crater basins) vs. fine-scale structure (small craters); both are useful but behave differently as resolution changes                                                                                        |
 
 <p align="center">
   <img src="https://assets.science.nasa.gov/content/dam/science/psd/photojournal/pia/pia14/pia14012/PIA14012.jpg" width="55%" alt="Diophantus crater flank illustrating shadow-driven contrast" />
@@ -291,13 +291,13 @@ flowchart LR
     I[Image] --> K[Keypoints] --> D[Descriptors] --> M[Matching]
 ```
 
-A keypoint answers *"where is the distinctive location?"*. A descriptor answers *"what does
-its local neighborhood look like?"*. SIFT is our baseline, not our final research claim.
+A keypoint answers _"where is the distinctive location?"_. A descriptor answers _"what does
+its local neighborhood look like?"_. SIFT is our baseline, not our final research claim.
 
 ### Learned correspondence
 
 - **SuperPoint** jointly detects interest points and computes descriptors using a fully
-  convolutional network, and introduces *homographic adaptation* to improve repeatability
+  convolutional network, and introduces _homographic adaptation_ to improve repeatability
   [5].
 - **LoFTR** takes a different approach: instead of a conventional detector → descriptor →
   matcher sequence, it establishes coarse dense correspondences and then refines them. The
@@ -458,12 +458,12 @@ level, or Sun angle.
 
 The eventual system can use interpretable rules rather than a black-box classifier:
 
-| Condition | Strategy |
-|---|---|
-| Good texture | SIFT / SuperPoint → matching → RANSAC |
-| Weak texture, visible craters | Crater cues → geometric crater matching |
-| Strong illumination difference | Illumination-robust representation → feature/learned matching |
-| Small viewpoint difference | Local feature matching → global model |
+| Condition                           | Strategy                                                                 |
+| ----------------------------------- | ------------------------------------------------------------------------ |
+| Good texture                        | SIFT / SuperPoint → matching → RANSAC                                    |
+| Weak texture, visible craters       | Crater cues → geometric crater matching                                  |
+| Strong illumination difference      | Illumination-robust representation → feature/learned matching            |
+| Small viewpoint difference          | Local feature matching → global model                                    |
 | Strong spatially varying distortion | Global model → large structured residuals → piecewise/local registration |
 
 The first implementation should use **transparent rules and measurable thresholds**, not a
@@ -518,17 +518,17 @@ license before including any of their figures.
 
 The benchmark should systematically vary:
 
-| Factor | Example conditions |
-|---|---|
-| Illumination | low / medium / high Sun-angle difference |
-| Scale | same / moderate / large scale difference |
-| Viewpoint | small / medium / large viewpoint change |
-| Texture | high / medium / low |
-| Terrain | crater-rich / mare / mixed |
+| Factor         | Example conditions                                |
+| -------------- | ------------------------------------------------- |
+| Illumination   | low / medium / high Sun-angle difference          |
+| Scale          | same / moderate / large scale difference          |
+| Viewpoint      | small / medium / large viewpoint change           |
+| Texture        | high / medium / low                               |
+| Terrain        | crater-rich / mare / mixed                        |
 | Representation | raw / CLAHE / gradient / edge / Laplacian / phase |
-| Matcher | SIFT / SuperPoint / LoFTR / crater-based |
-| Geometry | similarity / affine / homography / piecewise |
-| Metrics | RMSE / inlier ratio / coverage / runtime |
+| Matcher        | SIFT / SuperPoint / LoFTR / crater-based          |
+| Geometry       | similarity / affine / homography / piecewise      |
+| Metrics        | RMSE / inlier ratio / coverage / runtime          |
 
 The first experiments should use **synthetic data with known transformations**, followed by
 controlled lunar-image experiments, and finally real Chandrayaan-2/LRO cross-sensor pairs.
@@ -725,16 +725,16 @@ experimental results):
 
 ## 🛣️ Development Roadmap
 
-| Phase | Focus | Key items |
-|---|---|---|
-| **1** | Reliable classical baseline | dataset ingestion, grayscale/CLAHE, SIFT, descriptor matching, Lowe ratio test, RANSAC, homography, warping, RMSE, inlier ratio, match visualization |
-| **2** | Illumination-robust representations | representation abstraction, CLAHE/gradient/local-contrast/Laplacian/edge benchmarks, multi-scale representations, phase-congruency & shadow-suppression investigation |
-| **3** | Representation benchmark | fixed image-pair benchmark, controlled illumination experiments, RMSE/inlier/coverage/runtime comparison, representation ranking |
-| **4** | Adaptive pair analysis | texture-strength, illumination-difference, scale-difference, geometric-difficulty analysis, interpretable strategy selection |
-| **5** | Alternative correspondence | SuperPoint, learned matching, LoFTR, crater-based correspondence, cross-sensor experiments |
-| **6** | Terrain-aware geometry | translation/similarity/affine/homography models, residual-map analysis, model-complexity penalty, piecewise/grid registration, global-vs-local benchmark |
-| **7** | High-precision registration | local optimization, sub-pixel refinement, high-precision error evaluation, spatially uniform control-point selection |
-| **8** | Final adaptive system | end-to-end adaptive pipeline, confidence estimation, automated benchmarking, real Chandrayaan-2 experiments, cross-mission experiments, reproducible result package, final documentation |
+| Phase | Focus                               | Key items                                                                                                                                                                                |
+| ----- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1** | Reliable classical baseline         | dataset ingestion, grayscale/CLAHE, SIFT, descriptor matching, Lowe ratio test, RANSAC, homography, warping, RMSE, inlier ratio, match visualization                                     |
+| **2** | Illumination-robust representations | representation abstraction, CLAHE/gradient/local-contrast/Laplacian/edge benchmarks, multi-scale representations, phase-congruency & shadow-suppression investigation                    |
+| **3** | Representation benchmark            | fixed image-pair benchmark, controlled illumination experiments, RMSE/inlier/coverage/runtime comparison, representation ranking                                                         |
+| **4** | Adaptive pair analysis              | texture-strength, illumination-difference, scale-difference, geometric-difficulty analysis, interpretable strategy selection                                                             |
+| **5** | Alternative correspondence          | SuperPoint, learned matching, LoFTR, crater-based correspondence, cross-sensor experiments                                                                                               |
+| **6** | Terrain-aware geometry              | translation/similarity/affine/homography models, residual-map analysis, model-complexity penalty, piecewise/grid registration, global-vs-local benchmark                                 |
+| **7** | High-precision registration         | local optimization, sub-pixel refinement, high-precision error evaluation, spatially uniform control-point selection                                                                     |
+| **8** | Final adaptive system               | end-to-end adaptive pipeline, confidence estimation, automated benchmarking, real Chandrayaan-2 experiments, cross-mission experiments, reproducible result package, final documentation |
 
 ---
 
@@ -742,11 +742,11 @@ experimental results):
 
 This project follows a strict distinction between:
 
-| Status | Meaning |
-|---|---|
-| **Implemented** | Code exists and has been tested |
-| **Experimental** | A method exists but its performance is still being evaluated |
-| **Proposed** | A research direction has been designed but not implemented |
+| Status           | Meaning                                                                  |
+| ---------------- | ------------------------------------------------------------------------ |
+| **Implemented**  | Code exists and has been tested                                          |
+| **Experimental** | A method exists but its performance is still being evaluated             |
+| **Proposed**     | A research direction has been designed but not implemented               |
 | **Demonstrated** | A method has been validated on a defined benchmark with reported results |
 
 Do **not** claim illumination invariance, scale invariance, sub-pixel accuracy,
@@ -822,17 +822,17 @@ The long-term research hypothesis is:
 > correspondence method, and geometric model to the observable characteristics of the image
 > pair rather than applying one fixed registration pipeline to every pair.**
 
-| # | Research question |
-|---|---|
-| **RQ1 — Representation** | Which terrain-structure representation produces the most stable correspondences under lunar illumination changes? |
-| **RQ2 — Adaptation** | Can observable pair characteristics predict which correspondence strategy is most reliable? |
-| **RQ3 — Geometry** | When does a global geometric model fail on non-planar lunar terrain, and when does a piecewise model provide a meaningful improvement without overfitting? |
+| #                        | Research question                                                                                                                                          |
+| ------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **RQ1 — Representation** | Which terrain-structure representation produces the most stable correspondences under lunar illumination changes?                                          |
+| **RQ2 — Adaptation**     | Can observable pair characteristics predict which correspondence strategy is most reliable?                                                                |
+| **RQ3 — Geometry**       | When does a global geometric model fail on non-planar lunar terrain, and when does a piecewise model provide a meaningful improvement without overfitting? |
 
 ---
 
 ## 🏆 Intended Contribution
 
-The intended contribution is therefore **not** *"we implemented SIFT."* Instead:
+The intended contribution is therefore **not** _"we implemented SIFT."_ Instead:
 
 > **We develop and evaluate an adaptive lunar image-registration framework that treats
 > illumination-robust representation selection, correspondence strategy selection, and
