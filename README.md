@@ -1,406 +1,1613 @@
-# Lunar Image Registration & Correspondence Engine
+# 🌕 Lunar Image Registration
 
-### Multi-modal, Sun-Angle, and Scale-Invariant Image Registration for Chandrayaan-2 Planetary Observations
+### Adaptive, Illumination-Robust and Scale-Aware Image Correspondence for Chandrayaan-2 Optical Imagery
 
-[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-38%2F38%20Passing-brightgreen.svg)]()
-[![SIH-2026](https://img.shields.io/badge/SIH-Problem%2026166-purple.svg)]()
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green)](#license)
+[![Status](https://img.shields.io/badge/Status-In%20Development-orange)](#project-status)
+[![Domain](https://img.shields.io/badge/Domain-Lunar%20Computer%20Vision-purple)](#research-direction)
 
----
+> **Research principle:** Do not assume that two lunar images should
+> have similar pixels. Instead, identify and match the **terrain
+> structure** that remains useful when illumination, scale, viewpoint,
+> and sensor characteristics change.
 
-## 1. Executive Summary & Problem Statement
+------------------------------------------------------------------------
 
-**Smart India Hackathon 2026 — Problem Statement ID 26166**  
-**Title:** Multi-modal, Sun angle and scale invariant image correspondence using Chandrayaan-2 optical images (OHRC, TMC and IIRS)  
-**Organization:** Indian Space Research Organisation (ISRO)  
+## Overview
 
-Planetary surface observations from orbit are acquired under radically varying observation geometries:
-- **Solar Illumination & Sun Angles:** Solar elevation and azimuth angles change continuously, casting dynamic shadows, reversing shadow-lit rim edges, and washing out planar topography.
-- **Multi-Sensor Spatial Scale:** Ground Sample Distance (GSD) ranges from sub-meter (Chandrayaan-2 OHRC: $\sim 0.25\text{ m/px}$) to regional stereo (TMC-2: $\sim 5.0\text{ m/px}$) and spectral mapping (IIRS: $\sim 80\text{ m/px}$).
-- **Rugged 3D Topography:** Deep impact craters, towering central peaks, and steep crater walls violate the 2D planar assumption required by standard single-homography projective models.
+**Lunar Image Registration** is a research-oriented computer-vision
+framework for finding reliable correspondences between lunar images and
+aligning them into a common coordinate system.
 
-This repository provides an **adaptive, lunar-aware registration system** that upgrades classical computer vision with:
-1. **Terrain-Structure Representations** (Gradients, CLAHE, Local Contrast, Phase Congruency Proxy) that remain stable when raw pixel brightness inverts.
-2. **Pre-Registration Pair Characterization** to quantify texture, illumination divergence, scale ratios, and topographic visual roughness prior to feature detection.
-3. **Parsimonious Geometric Model Selection** that rigorously tests Translation (2 DOF), Similarity (4 DOF), Affine (6 DOF), and Homography (8 DOF), selecting the simplest model that explains correspondences without overfitting.
-4. **Piecewise Local Homography with Distance-Feathered Warping** to register complex 3D relief without tearing or seam artifacts.
-5. **Spatial Match Regularization** that evaluates grid occupancy and Gini concentration to prevent correspondence clustering on a single high-contrast crater rim.
-6. **Explainable Composite Confidence Scoring** ($S_{conf} \in [0.0, 1.0]$) providing space mission operators with transparent verification metrics.
-7. **Controlled Synthetic Benchmark Suite** with procedural crater generation and known ground-truth transforms to measure absolute sub-pixel error.
+The target use case is cross-sensor and cross-mission lunar imagery,
+including Chandrayaan-2 observations such as:
 
----
+-   **OHRC** --- Orbiter High Resolution Camera
+-   **TMC-2** --- Terrain Mapping Camera-2
+-   **IIRS** --- Imaging Infrared Spectrometer
 
-## 2. Theoretical Primer: Core Computer Vision Concepts
+and reference imagery such as:
 
-To make this codebase completely transparent and accessible to undergraduate researchers, engineers, and judges, this section breaks down the foundational math behind every pipeline stage.
+-   **LRO NAC** --- Lunar Reconnaissance Orbiter Narrow Angle Camera
+-   **SELENE/Kaguya** imagery
 
-### 2.1 Feature Detection & SIFT Scale-Space
-The **Scale-Invariant Feature Transform (SIFT)** detects blobs and corner-like structures that persist across different scale levels:
-1. **Scale-Space Construction:** The input image $I(x, y)$ is repeatedly convolved with variable-scale Gaussian kernels $G(x, y, \sigma)$:
-   $$L(x, y, \sigma) = G(x, y, \sigma) * I(x, y)$$
-2. **Difference-of-Gaussians (DoG):** Scale-space extrema are identified by subtracting adjacent octaves:
-   $$D(x, y, \sigma) = L(x, y, k\sigma) - L(x, y, \sigma)$$
-3. **Descriptor Vector:** Each keypoint is assigned a canonical orientation based on local image gradient directions, followed by computing an 8-bin orientation histogram over a $4 \times 4$ grid of sub-patches, resulting in a **128-dimensional invariant descriptor vector**.
+The SIH problem requires correspondence under changing **Sun angle,
+scale, viewpoint, and sensor characteristics**, together with spatially
+distributed matches and accurate registration.
 
-### 2.2 Correspondence Matching & Lowe's Ratio Test
-For each descriptor $d_{src}$ in the source image, Euclidean distance is measured against all descriptors in the reference image. To eliminate ambiguous matches occurring in repetitive terrain:
-$$\text{Ratio} = \frac{\|d_{src} - d_{ref, 1}\|_2}{\|d_{src} - d_{ref, 2}\|_2} < \tau \quad (\text{typically } \tau = 0.75)$$
-If the closest match $d_{ref, 1}$ is not distinctively closer than the second-closest match $d_{ref, 2}$, the match is discarded as ambiguous.
+Our project goes beyond a fixed `SIFT → RANSAC → Homography` pipeline.
 
-### 2.3 Outlier Rejection via RANSAC
-Even after ratio testing, false matches occur due to sensor noise and terrain repetition. **Random Sample Consensus (RANSAC)** iteratively identifies the largest geometrically consistent consensus set:
-1. Randomly sample the minimum points required to parameterize the geometric model (e.g. 4 points for Homography).
-2. Fit candidate matrix $H$.
-3. Compute symmetric transfer error for all correspondences: $e_i = \|p_i' - H p_i\|$.
-4. Count inliers satisfying $e_i \le \text{threshold}$.
-5. Re-estimate $H$ over the maximal consensus inlier set using Singular Value Decomposition (SVD).
+The proposed system is **adaptive**:
 
-### 2.4 Transformation Models & Parsimony
-Planetary scenes do not always warrant an 8-DOF Homography:
-- **Translation (2 DOF):** Rigid shift $[t_x, t_y]$. Ideal for narrow-baseline, nadir-pointing orbital frames with negligible rotation.
-- **Similarity (4 DOF):** Translation + rotation $\theta$ + isotropic scale $s$. Preserves angles and aspect ratios.
-- **Affine (6 DOF):** Similarity + anisotropic scaling + shear. Models non-orthogonal sensor pushbroom geometries.
-- **Homography (8 DOF):** Planar perspective projection. Models arbitrary viewing angles of a planar surface.
+1.  characterize the image pair,
+2.  generate illumination-robust terrain representations,
+3.  choose an appropriate correspondence strategy,
+4.  estimate and validate the geometric model,
+5.  fall back from global to local registration when the terrain
+    requires it,
+6.  refine the result,
+7.  report quantitative confidence.
 
-**The Parsimony Principle:** *A higher-degree-of-freedom model is only accepted if its reprojection RMSE decreases by at least $15\%$ without a collapse in the inlier consensus set.* Overfitting an 8-DOF model on planar nadir imagery introduces unconstrained corner warping.
+The SIH problem statement itself identifies illumination, viewpoint, and
+scale as central challenges. fileciteturn1file0
 
----
+------------------------------------------------------------------------
 
-## 3. Why Classical Methods Struggle on Lunar Imagery
+# 🎯 Problem Statement
 
-| Challenge | Physical Cause | Impact on Classical SIFT | Adaptive Solution |
-| :--- | :--- | :--- | :--- |
-| **Sun-Angle Variation** | Solar elevation and azimuth shift; crater shadows lengthen or reverse. | Raw intensity values invert across crater rims; SIFT gradient orientations flip by $180^\circ$, causing matching to fail. | **Structural representations** (Sobel gradient magnitude, local contrast, CLAHE) preserve slope boundaries regardless of shadow direction. |
-| **Scale Discrepancy** | High-res framing camera (OHRC $\sim 0.25$ m) vs medium-res stereo (TMC-2 $\sim 5$ m). | Octave pyramids fail to overlap when scale jump exceeds $4\times$. | **Metadata-guided scale downsampling** & spectral frequency ratio proxy. |
-| **Topographic Relief** | Craters and mountain massifs have significant 3D depth relative to orbit height. | Violates planar homography; single $3 \times 3$ matrix yields high residuals at crater rims. | **Piecewise local homography** with distance-feathered grid blending. |
-| **Crater Rim Clustering** | High-contrast shadow boundaries on a single large crater dominate feature detection. | $90\%$ of correspondences fall in one quadrant; geometric fit is unstable elsewhere. | **Spatial match bucketing** and Gini concentration penalty. |
+**SIH Problem Statement ID:** 26166
 
----
+**Title:** *Multi-modal, Sun angle and scale invariant image
+correspondence using Chandrayaan-2 optical images (OHRC, TMC and IIRS)*
 
-## 4. End-to-End System Architecture
+**Organization:** Indian Space Research Organisation (ISRO)
 
-```text
-               Source Image (OHRC / TMC-2)              Reference Image (LROC / TMC-2)
-                          │                                           │
-                          ▼                                           ▼
-              ┌───────────────────────────────────────────────────────────────────┐
-              │               1. Pair Characterization Engine                    │
-              │  - Texture Variance & Entropy       - Bhattacharyya Distance      │
-              │  - Spectral High-Frequency Ratio    - Visual Relief Proxy         │
-              └─────────────────────────────────┬─────────────────────────────────┘
-                                                │
-                                                ▼
-              ┌───────────────────────────────────────────────────────────────────┐
-              │               2. Adaptive Strategy Selector                       │
-              │  Rule-based recommendation of representation, feature budget,     │
-              │  matcher ratio threshold, and geometric complexity model.         │
-              └─────────────────────────────────┬─────────────────────────────────┘
-                                                │
-                                                ▼
-              ┌───────────────────────────────────────────────────────────────────┐
-              │               3. Terrain Structure Representation                 │
-              │  Transform raw pixels -> CLAHE / Gradient / Local Contrast        │
-              └─────────────────────────────────┬─────────────────────────────────┘
-                                                │
-                                                ▼
-              ┌───────────────────────────────────────────────────────────────────┐
-              │               4. Feature Extraction & Matching                    │
-              │  - SIFT with adaptive feature budget & contrast thresholds        │
-              │  - Lowe's ratio test matching                                     │
-              │  - Spatial match bucketing (caps points per grid cell)            │
-              └─────────────────────────────────┬─────────────────────────────────┘
-                                                │
-                                                ▼
-              ┌───────────────────────────────────────────────────────────────────┐
-              │               5. Parsimonious Model Selection                     │
-              │  Fits Translation (2) -> Similarity (4) -> Affine (6) -> Homo (8) │
-              │  Selects simplest model explaining data within RMSE threshold     │
-              └─────────────────────────────────┬─────────────────────────────────┘
-                                                │
-                                                ▼
-              ┌───────────────────────────────────────────────────────────────────┐
-              │               6. Warping & Piecewise Refinement                   │
-              │  - Global projective warp OR 3x3 local tiled piecewise blend      │
-              └─────────────────────────────────┬─────────────────────────────────┘
-                                                │
-                                                ▼
-              ┌───────────────────────────────────────────────────────────────────┐
-              │               7. Verification & Confidence Scoring                │
-              │  Composite Score S_conf in [0, 1] + Checkerboard + Anaglyph Blend │
-              └───────────────────────────────────────────────────────────────────┘
+**Category:** Software
+
+**Theme:** Space Technology
+
+The problem is fundamentally an **image correspondence and registration
+problem**:
+
+> Given two observations of approximately the same lunar terrain, find
+> reliable corresponding points and transform the moving/source image
+> into the coordinate system of the fixed/reference image.
+
+The difficulty is that the same terrain may look very different because:
+
+-   the Sun illuminates it from a different direction,
+-   shadows move,
+-   spatial resolution changes,
+-   the spacecraft viewpoint changes,
+-   different sensors have different imaging characteristics,
+-   terrain relief produces spatially varying geometric distortion.
+
+------------------------------------------------------------------------
+
+# 💡 Core Research Idea
+
+Traditional registration often starts with:
+
+``` text
+Image A
+   ↓
+SIFT
+   ↓
+Match
+   ↓
+RANSAC
+   ↓
+Homography
 ```
 
----
+Our research question is more specific to the Moon:
 
-## 5. Installation & Setup
+> **If the pixels change strongly but the underlying terrain structure
+> remains related, can we make registration more robust by explicitly
+> representing and selecting stable terrain structure?**
 
-### Requirements
-- Python 3.10, 3.11, 3.12, or 3.13
-- OpenCV (`opencv-python` / `opencv-contrib-python`)
-- NumPy
-- PyYAML
-- pytest (for automated tests)
+Instead of asking only:
 
-### Clone & Install
-```bash
-# Clone the repository
-git clone https://github.com/astrochoubey/Multi-modal-Sun-angle-and-scale-invariant-image-correspondence-using-Chandrayaan-2-optical-images.git
-cd Multi-modal-Sun-angle-and-scale-invariant-image-correspondence-using-Chandrayaan-2-optical-images
+> "Do these pixels look similar?"
 
-# Create and activate virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
+we ask:
 
-# Install dependencies
-pip install -r requirements.txt
-pip install -e .
+> **"Does the underlying terrain structure look similar?"**
+
+This motivates a family of representations:
+
+-   CLAHE / local contrast
+-   gradient magnitude
+-   edge maps
+-   Laplacian structure
+-   phase congruency
+-   shadow-suppressed representations
+-   multi-scale representations
+
+These are **candidate representations**, not assumptions about which
+method is universally best. The benchmark should determine which
+representation is most stable for each imaging condition.
+
+This direction is strongly motivated by planetary-registration
+literature: lunar/planetary imagery is known to suffer from low
+contrast, uneven illumination, shadow effects, weak textures, and
+geometric changes. Earlier planetary work explicitly noted that methods
+developed for Earth remote sensing do not always transfer cleanly to
+lunar imagery. \[1\]\[2\]
+
+------------------------------------------------------------------------
+
+# 🧠 What Makes This Different?
+
+Our proposed contribution is not simply another implementation of SIFT.
+
+The system investigates three connected ideas:
+
+### 1. Representation selection
+
+Different illumination conditions may favor different structural
+representations.
+
+``` text
+                 IMAGE PAIR
+                     │
+        ┌────────────┼────────────┐
+        ▼            ▼            ▼
+      CLAHE       GRADIENT      EDGES
+        │            │            │
+        ▼            ▼            ▼
+      SIFT          SIFT          SIFT
+        │            │            │
+        ▼            ▼            ▼
+     Metrics       Metrics       Metrics
+        │            │            │
+        └────────────┼────────────┘
+                     ▼
+             BEST REPRESENTATION
 ```
 
----
+### 2. Adaptive correspondence
 
-## 6. CLI Command Guide
+Different image pairs may require different matching strategies.
 
-The toolkit provides 5 unified subcommands through `python -m lunar_registration`:
-
-### 1. `register`: Classical Baseline Registration
-Runs Atharv386's classical SIFT + RANSAC homography pipeline.
-```bash
-python -m lunar_registration register \
-    --source data/raw/source.png \
-    --reference data/raw/reference.png \
-    --output-dir outputs/baseline
-```
-*Outputs:* `outputs/baseline/registered/registered.png`, `matches/matches.png`, `metrics/results.json`.
-
----
-
-### 2. `adaptive`: Full Adaptive Registration Pipeline
-Runs pair diagnostics, selects optimal representations, applies parsimonious model selection, runs piecewise warping if rugged terrain is detected, and scores registration confidence.
-```bash
-python -m lunar_registration adaptive \
-    --source data/raw/source.png \
-    --reference data/raw/reference.png \
-    --output-dir outputs/adaptive_run
-```
-*Optional Flags:*
-- `--gsd-source 0.5 --gsd-reference 5.0`: Ingest known Ground Sample Distance metadata.
-- `--force-model similarity`: Force a specific geometric model (`translation`, `similarity`, `affine`, `homography`).
-- `--no-piecewise`: Disable tiled local homography refinement.
-- `--spatial-filter`: Enforce spatial match bucketing to cap crater-rim concentration.
-
-*Terminal Output Example:*
-```text
-=================================================================
-Adaptive Lunar Registration Pipeline
-=================================================================
-Source:    data/raw/source.png
-Reference: data/raw/reference.png
-
------------------------------------------------------------------
-1. Pair Diagnostics:
-  - Source Texture:       medium_texture (variance=910.0)
-  - Reference Texture:    texture_rich (variance=1802.5)
-  - Illumination Shift:   benign_illumination (Bhattacharyya dist=0.140)
-  - Relief Visual Proxy:  high_relief_proxy (mean edge density=0.108)
-
-2. Adaptive Strategy Selected:
-  - Representation:       clahe
-  - SIFT Feature Budget:  5000 (contrast thresh=0.03)
-  - Lowe Ratio Cutoff:    0.75
-  - Strategy Rationale:   Benign illumination: standard CLAHE contrast conditioning selected. | Spectral high-frequency disparity (0.10): adjusting scale pyramid. | High terrain relief proxy (rugged crater rims/massifs): selecting Homography with piecewise grid refinement contingency.
-
-3. Geometric Model Comparison:
-  Model          DOF   Inliers   Inlier Ratio   RMSE (px) 
-  ------------------------------------------------------
-  translation    2     35        0.673          2.136     
-  similarity     4     34        0.654          1.390     
-  affine         6     34        0.654          1.133     
-  homography     8     40        0.769          1.312      [SELECTED]
-
-4. Registration Outcome:
-  - Status:               SUCCESS
-  - Model Used:           HOMOGRAPHY
-  - Inlier Matches:       40 / 52 (76.9%)
-  - Reprojection RMSE:    1.3118 pixels
-  - Piecewise Warp Used:  True
-
-5. Explainable Confidence Assessment:
-  - Score:                0.8015 / 1.0000
-  - Classification:       HIGH_CONFIDENCE
-  - Trustworthy:          True
-  - Rationale:            Confidence HIGH_CONFIDENCE (0.80) evaluated from 40 inliers (76.9% ratio), 1.31px RMSE, and 40.6% spatial coverage.
-
-6. Spatial Match Regularization:
-  - Grid Coverage Ratio:  40.6% of cells occupied
-  - Gini Concentration:   0.753 (0=uniform, 1=clustered)
+``` text
+                   IMAGE PAIR
+                       │
+                       ▼
+                PAIR ANALYSIS
+                       │
+          ┌────────────┼────────────┐
+          ▼            ▼            ▼
+      Good texture  Weak texture  Large illumination
+          │            │            │
+          ▼            ▼            ▼
+         SIFT      Crater cues   Normalized features
+          │            │            │
+          └────────────┼────────────┘
+                       ▼
+                  CORRESPONDENCE
 ```
 
-*Generated Artifacts:*
-- `registered.png`: Fully registered source image.
-- `matches.png`: Side-by-side match correspondence lines.
-- `checkerboard.png`: Alternating block visual seam alignment check.
-- `blend.png`: False-color cyan/magenta anaglyph (aligned areas appear grey/monochrome; errors appear as color fringes).
-- `spatial_distribution.png`: Grid cell match density map.
-- `registration_report.json`: Full machine-readable audit report.
+### 3. Adaptive geometry
 
----
+We do not assume that one global homography is always sufficient.
 
-### 3. `characterize`: Image Pair Pre-Diagnostics
-Computes quantitative image metrics prior to running any heavy registration algorithms.
-```bash
-python -m lunar_registration characterize \
-    --source data/raw/source.png \
-    --reference data/raw/reference.png
+``` text
+Correspondences
+       │
+       ▼
+Global model
+       │
+       ▼
+Check residuals
+   │          │
+   │          └───────────────┐
+   ▼                          ▼
+Good enough               Spatially structured error
+   │                          │
+   ▼                          ▼
+Use global model          Local / piecewise model
 ```
 
----
+The governing principle is:
 
-### 4. `benchmark`: Multi-Representation Benchmark
-Evaluates all 7 representation filters on the same image pair to see which produces the highest inlier count and lowest RMSE.
-```bash
-python -m lunar_registration benchmark \
-    --source data/raw/source.png \
-    --reference data/raw/reference.png
+> **Use the simplest transformation model that adequately explains the
+> observed correspondences.**
+
+This avoids both underfitting and unnecessary geometric complexity.
+
+------------------------------------------------------------------------
+
+# 🛰️ End-to-End Pipeline
+
+``` text
+ ┌──────────────────────┐       ┌──────────────────────┐
+ │   SOURCE / MOVING    │       │ REFERENCE / FIXED    │
+ │  Chandrayaan-2 etc.  │       │ LRO / SELENE etc.    │
+ └──────────┬───────────┘       └──────────┬───────────┘
+            │                              │
+            └──────────────┬───────────────┘
+                           ▼
+                ┌─────────────────────┐
+                │   1. PAIR ANALYSIS  │
+                │ texture / scale /   │
+                │ illumination /      │
+                │ geometric cues      │
+                └──────────┬──────────┘
+                           ▼
+             ┌──────────────────────────┐
+             │ 2. REPRESENTATION BANK   │
+             │                          │
+             │ raw / CLAHE / gradient / │
+             │ contrast / Laplacian /   │
+             │ edges / phase / scales   │
+             └────────────┬─────────────┘
+                          ▼
+             ┌──────────────────────────┐
+             │ 3. CORRESPONDENCE        │
+             │                          │
+             │ SIFT / learned features /│
+             │ crater cues / dense      │
+             │ matching                 │
+             └────────────┬─────────────┘
+                          ▼
+             ┌──────────────────────────┐
+             │ 4. MATCH FILTERING       │
+             │                          │
+             │ ratio test / cross-check │
+             │ / confidence filtering   │
+             └────────────┬─────────────┘
+                          ▼
+             ┌──────────────────────────┐
+             │ 5. ROBUST GEOMETRY       │
+             │                          │
+             │ RANSAC / MAGSAC-style    │
+             │ estimation               │
+             └────────────┬─────────────┘
+                          ▼
+             ┌──────────────────────────┐
+             │ 6. MODEL SELECTION       │
+             │                          │
+             │ translation → similarity │
+             │ → affine → homography    │
+             └────────────┬─────────────┘
+                          │
+                global model sufficient?
+                     /            \
+                   YES             NO
+                    │               │
+                    ▼               ▼
+              global warp      piecewise/local
+                                    │
+                                    ▼
+                               H₁ H₂ ... Hₙ
+                                    │
+                    ┌───────────────┘
+                    ▼
+             ┌──────────────────────────┐
+             │ 7. REFINEMENT           │
+             │                          │
+             │ local optimization /     │
+             │ sub-pixel refinement     │
+             └────────────┬─────────────┘
+                          ▼
+             ┌──────────────────────────┐
+             │ 8. REGISTRATION OUTPUT   │
+             │                          │
+             │ registered image         │
+             │ correspondences          │
+             │ residual maps            │
+             └────────────┬─────────────┘
+                          ▼
+             ┌──────────────────────────┐
+             │ 9. CONFIDENCE / METRICS  │
+             │                          │
+             │ RMSE / inliers / ratio / │
+             │ spatial coverage / time  │
+             └──────────────────────────┘
 ```
 
----
+------------------------------------------------------------------------
 
-### 5. `synthetic`: Controlled Ground-Truth Evaluation Suite
-Generates simulated lunar crater surfaces with known geometric and radiometric distortions, evaluating corner transfer errors against absolute ground truth.
-```bash
-python -m lunar_registration synthetic --size 512
+# 🔬 Stage 1 --- Image-Pair Characterization
+
+Before selecting a registration method, the system should estimate what
+makes the pair difficult.
+
+## Texture strength
+
+A feature-rich region may contain:
+
+``` text
+       ○      •
+   •       ○
+       ╲
+  ○       •      ○
 ```
 
----
+while a smooth mare region may contain little repeatable texture.
 
-## 7. Five Suggested Reproducible Experiments
+Useful signals include:
 
-To explore the behavior of the registration pipeline, run these 5 standalone experiments:
+-   gradient density
+-   local variance
+-   edge density
+-   keypoint density
 
-### Experiment 1: Measuring Absolute Sub-Pixel Accuracy on Pure Translation
-**Goal:** Verify whether classical vs adaptive estimation recovers integer and fractional pixel shifts accurately against ground truth.
-```bash
-python -m lunar_registration synthetic --size 512
-```
-*Expected Finding:* Translation and Similarity models achieve $<0.05$ px corner transfer error on pure synthetic rigid shifts.
+## Illumination difference
 
-### Experiment 2: Stress-Testing Keystone Tilt (Perspective Homography)
-**Goal:** Test how well an 8-DOF Homography handles out-of-plane spacecraft viewing tilts.
-```bash
-python -m lunar_registration adaptive \
-    --source data/raw/source.png \
-    --reference data/raw/reference.png \
-    --force-model homography \
-    --output-dir outputs/exp2_homo
-```
-*Expected Finding:* Compare RMSE against `--force-model affine`. If the scene is planar, affine and homography show comparable RMSE, but homography may slightly deform unconstrained borders.
+We can compare:
 
-### Experiment 3: Extreme Sun Azimuth Shift (Why Gradients Win)
-**Goal:** Observe what happens when raw pixel intensity values invert due to a $90^\circ+$ solar azimuth rotation.
-```bash
-python -m lunar_registration benchmark \
-    --source data/raw/source.png \
-    --reference data/raw/reference.png
-```
-*Expected Finding:* On severe shadow shifts, raw grayscale matching drops inliers sharply or fails, whereas gradient magnitude and local contrast representations maintain stable edge correspondences.
+-   intensity distributions,
+-   local contrast,
+-   gradient statistics,
+-   shadow/bright-region statistics.
 
-### Experiment 4: Spatial Match Regularization vs Crater Rim Clustering
-**Goal:** Compare spatial distribution metrics with and without match bucketing.
-```bash
-# Without spatial filter (unconstrained)
-python -m lunar_registration adaptive \
-    --source data/raw/source.png \
-    --reference data/raw/reference.png \
-    --output-dir outputs/exp4_unconstrained
+The purpose is **not** to claim exact physical illumination recovery
+unless Sun geometry and photometric calibration are available.
 
-# With spatial filter (capped per grid cell)
-python -m lunar_registration adaptive \
-    --source data/raw/source.png \
-    --reference data/raw/reference.png \
-    --spatial-filter \
-    --output-dir outputs/exp4_regularized
-```
-*Expected Finding:* The regularized run lowers the Gini concentration coefficient from $\sim 0.75$ to $<0.50$, distributing tie points evenly across the lunar mare rather than clustering on a single crater.
+## Scale difference
 
-### Experiment 5: Model Parsimony vs Overfitting
-**Goal:** Validate why the parsimony principle protects against unconstrained degree-of-freedom expansion.
-```bash
-python -m lunar_registration adaptive \
-    --source data/raw/source.png \
-    --reference data/raw/reference.png \
-    --force-model translation \
-    --output-dir outputs/exp5_trans
-```
-*Expected Finding:* Compare `registration_report.json` between Translation and Homography. Notice that Translation has 2 DOF with slightly higher RMSE ($2.1$ px vs $1.3$ px), but preserves scale and orthogonality perfectly.
+We can estimate effective scale mismatch from:
 
----
+-   metadata where available,
+-   image resolution / ground sampling information,
+-   feature-scale statistics,
+-   preliminary correspondence behavior.
 
-## 8. Verification & Test Suite
+## Geometric difficulty
 
-All algorithms are covered by unit and integration test suites:
-```bash
-# Run the entire test suite
-pytest tests/ -v
+After initial matching, we can inspect:
+
+-   reprojection error,
+-   residual distribution,
+-   spatial consistency.
+
+This helps determine whether a single global model is plausible.
+
+------------------------------------------------------------------------
+
+# 🌗 Stage 2 --- Terrain-Structure Representations
+
+The key idea is to create several views of the same terrain.
+
+## Raw grayscale
+
+Baseline representation.
+
+## CLAHE
+
+Local contrast enhancement.
+
+Useful when global brightness differences hide local terrain structure.
+
+## Gradient magnitude
+
+Highlights rapid spatial intensity changes.
+
+Conceptually:
+
+``` text
+smooth terrain ─────────────
+                      ↑
+                 strong gradient
 ```
 
-**Test Coverage Summary:**
-- `test_representations.py`: Verifies all 7 representations (raw, clahe, gradient, local contrast, laplacian, edges, phase congruency) maintain shapes, dtypes, and range $[0, 255]$.
-- `test_pair_characterization.py`: Tests texture variance, Shannon entropy, Bhattacharyya distance, and spectral scale ratio.
-- `test_model_selection.py`: Verifies Translation, Similarity, Affine, Homography fitting, and parsimonious model ranking.
-- `test_piecewise.py`: Verifies tiled local homography fitting and feather-blended perspective accumulation.
-- `test_spatial_distribution.py`: Verifies grid coverage ratio, Gini inequality calculation, and spatial match bucketing.
-- `test_confidence.py`: Verifies explainable confidence score bounds $[0.0, 1.0]$ and classification logic.
-- `test_synthetic_suite.py`: Verifies crater generation, Lambertian shading, and ground-truth transform error calculation.
-- `test_adaptive_pipeline.py`: Tests end-to-end execution of `adaptive_register_images`.
+This can emphasize:
 
----
+-   crater rims,
+-   scarps,
+-   ridges,
+-   boundaries.
 
-## 9. Repository Structure
+## Edge map
 
-```text
+Focuses on structural boundaries rather than absolute intensity.
+
+## Laplacian
+
+Emphasizes second-order intensity changes and fine structure, while
+requiring care because it can amplify noise.
+
+## Local contrast
+
+Compares a pixel or patch against its local neighborhood rather than
+relying only on absolute brightness.
+
+## Phase congruency
+
+A more advanced structural representation that emphasizes significant
+local phase relationships rather than raw intensity magnitude.
+
+It is particularly interesting for this project because recent
+planetary-registration work has explored multi-scale phase-congruency
+representations under changing illumination. \[3\]
+
+## Shadow suppression
+
+A candidate preprocessing stage intended to reduce the effect of
+illumination/shadow regions.
+
+It should be treated as an experimental module, because aggressive
+shadow removal can also destroy useful terrain boundaries.
+
+## Multi-scale representations
+
+Large-scale structure:
+
+``` text
+        _________
+      /           \
+     |   CRATER    |
+      \___________/
+```
+
+Fine-scale structure:
+
+``` text
+   •  •  small craters
+      •
+```
+
+Both can be useful, but they behave differently when image resolution
+changes.
+
+------------------------------------------------------------------------
+
+# 🔎 Stage 3 --- Correspondence
+
+Once a representation is selected, we extract corresponding terrain
+features.
+
+## Classical baseline --- SIFT
+
+SIFT detects distinctive local structures and constructs descriptors
+intended to remain useful under changes such as scale, rotation, and
+moderate illumination/geometric variation. \[4\]
+
+Conceptually:
+
+``` text
+IMAGE
+  │
+  ▼
+keypoints
+  │
+  ▼
+descriptors
+  │
+  ▼
+matching
+```
+
+A keypoint answers:
+
+> **Where is the distinctive location?**
+
+A descriptor answers:
+
+> **What does its local neighborhood look like?**
+
+SIFT is our baseline, not our final research claim.
+
+------------------------------------------------------------------------
+
+# 🤖 Learned Correspondence
+
+The framework is designed to support learned methods such as:
+
+### SuperPoint
+
+SuperPoint jointly detects interest points and computes descriptors
+using a fully convolutional network. Its paper also introduces
+homographic adaptation for improving repeatability. \[5\]
+
+### LoFTR
+
+LoFTR takes a different approach: instead of requiring a conventional
+detector → descriptor → matcher sequence, it establishes coarse dense
+correspondences and then refines them. The authors specifically
+highlight its ability to produce matches in low-texture regions where
+detector-based methods can struggle. \[6\]
+
+This makes LoFTR an interesting candidate for lunar regions with weak
+local texture.
+
+**Important:** performance on ordinary indoor/outdoor benchmarks does
+not automatically imply equivalent performance on lunar imagery. The
+project therefore treats learned methods as experimental baselines to be
+evaluated on the actual lunar domain.
+
+------------------------------------------------------------------------
+
+# 🌑 Crater-Based Correspondence
+
+Some lunar scenes contain few strong generic keypoints but contain
+recognizable crater structures.
+
+A possible future strategy is:
+
+``` text
+Image
+  ↓
+Crater detection
+  ↓
+Center / radius / shape
+  ↓
+Crater geometry
+  ↓
+Cross-image matching
+  ↓
+Geometric registration
+```
+
+This is motivated by planetary navigation and registration literature in
+which crater patterns are used as stable lunar landmarks. \[7\]
+
+This module should only be considered **implemented** once an actual
+crater detector and geometric matching procedure are present.
+
+------------------------------------------------------------------------
+
+# 🧹 Stage 4 --- Match Filtering
+
+Raw feature matching can produce incorrect correspondences.
+
+The baseline pipeline can use:
+
+-   nearest-neighbor matching,
+-   Lowe ratio test,
+-   mutual/cross-check filtering,
+-   descriptor-distance filtering.
+
+The goal is:
+
+``` text
+Raw matches
+     │
+     ▼
+Candidate matches
+     │
+     ▼
+More reliable matches
+```
+
+------------------------------------------------------------------------
+
+# 🛡️ Stage 5 --- Robust Geometry with RANSAC
+
+Even good descriptor matching can contain false correspondences.
+
+RANSAC estimates a geometric model while tolerating a significant
+fraction of incorrect observations. It is a classic robust-estimation
+method introduced for model fitting and image-analysis problems. \[8\]
+
+Conceptually:
+
+``` text
+100 candidate matches
+       │
+       ▼
+      RANSAC
+       │
+ ┌─────┴─────┐
+ ▼           ▼
+INLIERS    OUTLIERS
+ 80          20
+```
+
+The **inliers** support a common geometric explanation.
+
+The **outliers** do not.
+
+------------------------------------------------------------------------
+
+# 📐 Stage 6 --- Geometric Model Selection
+
+We do not want to blindly use a homography.
+
+The candidate models are:
+
+``` text
+Translation
+     ↓
+Similarity
+     ↓
+Affine
+     ↓
+Homography
+     ↓
+Piecewise / local model
+```
+
+The model should become more complex only when the data requires it.
+
+## Why?
+
+A global homography assumes a single relationship between the images.
+
+But lunar terrain is three-dimensional:
+
+``` text
+              /\             crater rim
+             /  \
+____________/    \____________
+```
+
+Different elevations can create spatially varying image displacement
+when the viewpoint changes.
+
+Therefore:
+
+> **A single homography can fit one part of the terrain well while
+> producing systematic residuals elsewhere.**
+
+------------------------------------------------------------------------
+
+# 🧩 Global vs Piecewise Registration
+
+## Global model
+
+``` text
+┌─────────────────────────────┐
+│                             │
+│             H               │
+│                             │
+│    one transformation       │
+│       for the image         │
+│                             │
+└─────────────────────────────┘
+```
+
+## Piecewise model
+
+``` text
+┌─────────┬─────────┬─────────┐
+│   H₁    │   H₂    │   H₃    │
+├─────────┼─────────┼─────────┤
+│   H₄    │   H₅    │   H₆    │
+├─────────┼─────────┼─────────┤
+│   H₇    │   H₈    │   H₉    │
+└─────────┴─────────┴─────────┘
+```
+
+The piecewise model is used only if the residual structure justifies it.
+
+This prevents overfitting.
+
+------------------------------------------------------------------------
+
+# 📍 Stage 7 --- Spatially Distributed Matches
+
+A transformation supported only by one small crater cluster can be
+unstable.
+
+We therefore analyze match distribution over a grid:
+
+``` text
+┌─────┬─────┬─────┬─────┐
+│ ●   │     │ ●   │     │
+├─────┼─────┼─────┼─────┤
+│     │ ●   │     │ ●   │
+├─────┼─────┼─────┼─────┤
+│ ●   │     │ ●   │     │
+└─────┴─────┴─────┴─────┘
+```
+
+We can measure:
+
+-   occupied-cell fraction,
+-   match count per cell,
+-   spatial entropy,
+-   coverage,
+-   maximum local concentration.
+
+This directly supports the SIH requirement for spatially distributed
+correspondence.
+
+------------------------------------------------------------------------
+
+# 🎯 Stage 8 --- Registration and Refinement
+
+Once a valid model is selected:
+
+``` text
+Source image
+     │
+     ▼
+geometric transformation
+     │
+     ▼
+warping
+     │
+     ▼
+registered image
+```
+
+Then, where justified, local optimization can refine correspondence
+locations beyond integer-pixel coordinates.
+
+The system should **not claim sub-pixel accuracy merely because a
+sub-pixel optimizer exists**. It must be demonstrated against
+appropriate ground truth or reference measurements.
+
+------------------------------------------------------------------------
+
+# 📊 Stage 9 --- Evaluation
+
+Every experiment should produce reproducible metrics.
+
+## RMSE
+
+For corresponding points (p_i) and predicted points (`\hat `{=tex}p_i):
+
+\[ RMSE = `\sqrt{
+\frac{1}{N}
+\sum_{i=1}^{N}
+\left\|p_i-\hat p_i\right\|^2
+}`{=tex} \]
+
+Lower is generally better.
+
+## Inlier ratio
+
+\[ Inlier Ratio = `\frac{N_{inliers}}`{=tex} {N\_{matches}} \]
+
+Higher is generally better.
+
+## Spatial coverage
+
+Measures how widely correspondences are distributed across the image.
+
+## Additional metrics
+
+-   source keypoints
+-   reference keypoints
+-   raw matches
+-   filtered matches
+-   inliers
+-   reprojection RMSE
+-   spatial coverage
+-   runtime
+-   transformation-model complexity
+-   registration success/failure
+
+------------------------------------------------------------------------
+
+# 🧪 Research Benchmark
+
+The central benchmark should compare **representations**, not just
+algorithms.
+
+For example:
+
+``` text
+Same image pair
+       │
+       ├── Raw
+       ├── CLAHE
+       ├── Gradient
+       ├── Local contrast
+       ├── Laplacian
+       ├── Edge
+       └── Phase congruency
+              │
+              ▼
+       Same matcher + geometry
+              │
+              ▼
+       Compare RMSE / inliers /
+       coverage / runtime
+```
+
+This lets us ask:
+
+> **Which representation gives the most stable correspondences under
+> changing lunar illumination?**
+
+Then we can investigate whether the answer changes with terrain type,
+texture level, or Sun angle.
+
+------------------------------------------------------------------------
+
+# 🔬 Adaptive Decision Layer
+
+The eventual system can use interpretable rules.
+
+### Case A --- texture-rich
+
+``` text
+Good texture
+    ↓
+SIFT / SuperPoint
+    ↓
+matching
+    ↓
+RANSAC
+```
+
+### Case B --- weak texture + visible craters
+
+``` text
+Weak generic texture
+    ↓
+Crater cues
+    ↓
+Geometric crater matching
+```
+
+### Case C --- strong illumination difference
+
+``` text
+Large photometric difference
+    ↓
+Illumination-robust representation
+    ↓
+Feature / learned matching
+```
+
+### Case D --- small viewpoint difference
+
+``` text
+Small geometric change
+    ↓
+Local feature matching
+    ↓
+Global model
+```
+
+### Case E --- strong spatially varying distortion
+
+``` text
+Global model
+    ↓
+large structured residuals
+    ↓
+piecewise / local registration
+```
+
+The first implementation should use **transparent rules and measurable
+thresholds**, not a black-box classifier.
+
+------------------------------------------------------------------------
+
+# 📈 Literature Context
+
+This project is grounded in several lines of prior research.
+
+## Lunar / planetary image registration
+
+Planetary image-feature research has explicitly reported that lunar
+imagery can exhibit low contrast and uneven illumination, motivating
+specialized feature extraction rather than blindly transferring
+Earth-remote-sensing methods. \[1\]
+
+A systematic planetary co-registration study demonstrated
+multi-instrument registration across Mars and Moon datasets and focused
+on robustness to varied image inputs. \[2\]
+
+More recent work using Chandrayaan-2 lunar data has compared SIFT,
+ASIFT, AKAZE, RIFT2 and SuperGlue across cross-modality lunar image
+pairs, reporting that preprocessing and illumination conditions
+materially affect registration performance. \[9\]
+
+Recent lunar-image studies have also compared classical and learned
+feature methods across resolution changes. \[10\]
+
+## Illumination-robust structure
+
+Recent planetary-registration research has investigated photometric
+reliability, phase-congruency representations, brightness inversion and
+shadow migration specifically for lunar multi-illumination registration.
+\[3\]
+
+This strongly supports our decision to make **terrain-structure
+representation** a first-class research component rather than treating
+illumination as a minor preprocessing detail.
+
+## Learned matching
+
+SuperPoint provides a learned detector/descriptor baseline. \[5\]
+
+LoFTR provides a detector-free, coarse-to-fine correspondence baseline
+that is particularly interesting for low-texture regions. \[6\]
+
+------------------------------------------------------------------------
+
+# 🖼️ Literature Figures and Research Visuals
+
+This repository should distinguish between:
+
+### Original project diagrams
+
+The architecture diagrams in this README are **original diagrams created
+for this project**.
+
+### Literature figures
+
+For scientific attribution, the project should link to --- rather than
+silently copy --- figures from published work.
+
+Recommended figures to inspect when preparing the report/pitch:
+
+1.  **LoFTR Figure 1** --- comparison of detector-based and
+    detector-free matching in low-texture regions. \[6\]
+2.  **SuperPoint figures** --- learned keypoint detection and
+    homographic adaptation. \[5\]
+3.  **Automatic Extraction of Planetary Image Features** ---
+    lunar/planetary feature representations including contour and shape
+    features. \[1\]
+4.  **PWIFT framework figure** --- recent planetary multi-illumination
+    registration architecture using photometric reliability and phase
+    congruency. \[3\]
+5.  **Chandrayaan-2 comparative study** --- cross-sensor lunar
+    registration experiments and preprocessing comparisons. \[9\]
+
+When adding a copyrighted figure to a presentation or repository, check
+the paper's reuse license and attribution requirements first.
+
+------------------------------------------------------------------------
+
+# 📚 Key Literature
+
+### \[1\] Automatic Extraction of Planetary Image Features
+
+Troglio, G., Le Moigne, J., Moser, S. B., Serpico, S. B., &
+Benediktsson, J. A.
+
+The work specifically discusses lunar imagery, low contrast, uneven
+illumination, feature extraction and image registration.
+
+### \[2\] A Systematic Solution to Multi-Instrument Coregistration of High-Resolution Planetary Images to an Orthorectified Baseline
+
+Sidiropoulos, P. & Muller, J.-P.
+
+A multi-instrument planetary co-registration framework evaluated on Mars
+and Moon datasets.
+
+### \[3\] Photometric-weighted invariant feature transform for planetary surface image registration under complex illumination
+
+Yan, Q., Guo, Y., & Zeng, X.
+
+A recent planetary-registration approach using photometric reliability,
+phase congruency, bright/dark descriptors and homography-based cleanup.
+
+### \[4\] Distinctive Image Features from Scale-Invariant Keypoints
+
+Lowe, D. G., 2004.
+
+The foundational SIFT paper.
+
+### \[5\] SuperPoint: Self-Supervised Interest Point Detection and Description
+
+DeTone, D., Malisiewicz, T., & Rabinovich, A., 2018.
+
+Learned local feature detection and description.
+
+### \[6\] LoFTR: Detector-Free Local Feature Matching with Transformers
+
+Sun, J., Shen, Z., Wang, Y., Bao, H., & Zhou, X., 2021.
+
+Detector-free coarse-to-fine feature matching.
+
+### \[7\] Lunar Crater Identification in Digital Images
+
+Christian, J. A., Derksen, H., & Watkins, R., 2021.
+
+Open-access work on identifying lunar crater patterns for navigation and
+related applications.
+
+### \[8\] Random Sample Consensus
+
+Fischler, M. A. & Bolles, R. C., 1981.
+
+Foundational RANSAC paper.
+
+### \[9\] Comparative Evaluation of Traditional and Deep Learning Feature Matching Algorithms using Chandrayaan-2 Lunar Data
+
+Makharia, R., Singla, J. G., Amitabh, Dube, N., & Sharma, H., 2025.
+
+Comparison of classical and learned matching on Chandrayaan-2-related
+lunar data.
+
+### \[10\] MoonMetaSync: Lunar Image Registration Analysis
+
+Kumar, A., Kaushal, S., & Murthy, S. V., 2024.
+
+Comparison of SIFT, ORB and a proposed feature representation across
+lunar image scales.
+
+------------------------------------------------------------------------
+
+# 🧪 Experimental Matrix
+
+The benchmark should systematically vary:
+
+  Factor           Example conditions
+  ---------------- ---------------------------------------------------
+  Illumination     low / medium / high Sun-angle difference
+  Scale            same / moderate / large scale difference
+  Viewpoint        small / medium / large viewpoint change
+  Texture          high / medium / low
+  Terrain          crater-rich / mare / mixed
+  Representation   raw / CLAHE / gradient / edge / Laplacian / phase
+  Matcher          SIFT / SuperPoint / LoFTR / crater-based
+  Geometry         similarity / affine / homography / piecewise
+  Metrics          RMSE / inlier ratio / coverage / runtime
+
+The first experiments should use **synthetic data with known
+transformations**, followed by controlled lunar-image experiments, and
+finally real Chandrayaan-2/LRO cross-sensor pairs.
+
+------------------------------------------------------------------------
+
+# 🧪 Synthetic Test Strategy
+
+Before using difficult real lunar imagery, construct controlled
+experiments where the ground-truth transformation is known.
+
+``` text
+Reference image
+      │
+      ├── brightness change
+      ├── contrast change
+      ├── rotation
+      ├── scale
+      ├── perspective
+      └── local distortion
+             │
+             ▼
+        Synthetic source
+             │
+             ▼
+       registration system
+             │
+             ▼
+      compare with known
+       ground truth
+```
+
+This lets us distinguish:
+
+> **algorithm failure**
+
+from:
+
+> **dataset / overlap / sensor / metadata problems.**
+
+------------------------------------------------------------------------
+
+# 📁 Project Structure
+
+``` text
 lunar-image-registration/
 │
-├── configs/                 # Baseline YAML configurations (sift, superpoint, loftr)
+├── configs/
+│   ├── default.yaml
+│   ├── representations/
+│   └── experiments/
+│
 ├── data/
-│   ├── manifests/           # pilot_manifest.csv (DEV-01 to DEV-04 flight pairs)
-│   ├── raw/                 # Raw test imagery (source.png, reference.png)
-│   └── test/                # Controlled synthetic evaluation data
+│   ├── synthetic/
+│   ├── real/
+│   │   ├── ohrc/
+│   │   ├── tmc2/
+│   │   ├── iirs/
+│   │   ├── lro/
+│   │   └── selene/
+│   ├── processed/
+│   ├── patches/
+│   └── test/
 │
-├── docs/                    # Architectural and research documentation
-│   ├── research/            # Dossier, Annotated Bibliography, Prior Work Matrix
-│   ├── data/                # Pilot Data Audit Report & Acquisition Guides
-│   ├── dataset.md           # Sensor specifications (OHRC, TMC-2, IIRS)
-│   ├── methodology.md       # Algorithmic formulation & math
-│   └── experiments.md       # Experimental protocols & repeatability curves
+├── notebooks/
+│   ├── exploration/
+│   └── experiments/
 │
-├── notebooks/               # Jupyter research notebooks (01 to 07)
+├── src/
+│   └── lunar_registration/
+│       ├── io/
+│       ├── preprocessing/
+│       │   ├── clahe.py
+│       │   ├── gradient.py
+│       │   ├── local_contrast.py
+│       │   ├── laplacian.py
+│       │   ├── edges.py
+│       │   └── representations.py
+│       │
+│       ├── features/
+│       │   ├── sift.py
+│       │   ├── superpoint.py
+│       │   └── loftr.py
+│       │
+│       ├── matching/
+│       ├── geometry/
+│       │   ├── models.py
+│       │   ├── ransac.py
+│       │   └── model_selection.py
+│       │
+│       ├── registration/
+│       │   ├── global.py
+│       │   ├── piecewise.py
+│       │   └── refinement.py
+│       │
+│       ├── pair_analysis/
+│       ├── adaptive/
+│       ├── evaluation/
+│       │   ├── metrics.py
+│       │   ├── spatial.py
+│       │   └── confidence.py
+│       │
+│       └── utils/
 │
-├── src/lunar_registration/  # Core Python Package
-│   ├── __main__.py          # Entry point (python -m lunar_registration)
-│   ├── cli.py               # Unified CLI (register, adaptive, characterize, benchmark, synthetic)
-│   ├── adaptive/            # Interpretable strategy selection engine
-│   ├── analysis/            # Pre-registration pair characterization
-│   ├── evaluation/          # Metrics, confidence scoring, synthetic benchmark, visualizations
-│   ├── features/            # SIFT feature detection & description
-│   ├── geometry/            # Homography, model selection, piecewise local warping
-│   ├── io/                  # Robust planetary raster loaders (.png, .tif, .img)
-│   ├── matching/            # Lowe ratio test matcher & spatial distribution regularization
-│   ├── preprocessing/       # Radiometric normalization & 7 structural representations
-│   ├── registration/        # Classical and adaptive image warpers
-│   └── utils/               # Coordinate helpers & array utilities
+├── scripts/
+├── tests/
+├── outputs/
+│   ├── matches/
+│   ├── registered/
+│   ├── metrics/
+│   └── figures/
 │
-├── scripts/                 # Ingestion & data setup utilities
-├── tests/                   # 38 passing unit tests
-├── requirements.txt         # Project dependencies
-├── pyproject.toml           # Build system configuration
-└── README.md                # This documentation
+├── docs/
+│   ├── literature/
+│   └── experiments/
+│
+├── requirements.txt
+├── pyproject.toml
+├── LICENSE
+└── README.md
 ```
 
----
+------------------------------------------------------------------------
 
-## 10. Authors & License
+# 🚀 Installation
 
-- **Repository Maintainer:** Prachi Choubey ([@astrochoubey](https://github.com/astrochoubey))
-- **Baseline Collaboration:** Atharv386
-- **License:** [MIT License](LICENSE)
+``` bash
+git clone <repository-url>
+cd lunar-image-registration
+
+python -m venv .venv
+source .venv/bin/activate
+```
+
+Install dependencies:
+
+``` bash
+pip install -r requirements.txt
+```
+
+------------------------------------------------------------------------
+
+# ▶️ Usage
+
+## Baseline registration
+
+``` bash
+python -m lunar_registration.cli register \
+    --source data/real/source.tif \
+    --reference data/real/reference.tif \
+    --config configs/default.yaml
+```
+
+## Representation benchmark
+
+``` bash
+python -m lunar_registration.cli benchmark-representations \
+    --source data/real/source.tif \
+    --reference data/real/reference.tif
+```
+
+## Adaptive registration
+
+``` bash
+python -m lunar_registration.cli adaptive \
+    --source data/real/source.tif \
+    --reference data/real/reference.tif
+```
+
+## Evaluation
+
+``` bash
+python -m lunar_registration.cli evaluate \
+    --config configs/default.yaml
+```
+
+> These commands describe the intended CLI. Keep them synchronized with
+> the actual implementation.
+
+------------------------------------------------------------------------
+
+# 📦 Expected Outputs
+
+For every image pair:
+
+``` text
+outputs/
+├── registered/
+│   └── registered_image.tif
+│
+├── matches/
+│   ├── raw_matches.png
+│   └── inlier_matches.png
+│
+├── metrics/
+│   └── results.json
+│
+└── figures/
+    ├── representation_comparison.png
+    ├── residual_map.png
+    └── spatial_match_distribution.png
+```
+
+Example schema:
+
+``` json
+{
+  "representation": "gradient",
+  "feature_method": "sift",
+  "keypoints_source": 0,
+  "keypoints_reference": 0,
+  "raw_matches": 0,
+  "inliers": 0,
+  "inlier_ratio": 0.0,
+  "rmse_pixels": null,
+  "spatial_coverage": 0.0,
+  "runtime_seconds": 0.0,
+  "geometric_model": "homography",
+  "confidence": null
+}
+```
+
+The zero/null values are an output schema example, **not experimental
+results**.
+
+------------------------------------------------------------------------
+
+# 🛣️ Development Roadmap
+
+## Phase 1 --- Reliable Classical Baseline
+
+-   [ ] dataset ingestion
+-   [ ] image loading
+-   [ ] grayscale conversion
+-   [ ] CLAHE
+-   [ ] SIFT
+-   [ ] descriptor matching
+-   [ ] Lowe ratio test
+-   [ ] RANSAC
+-   [ ] homography
+-   [ ] warping
+-   [ ] RMSE
+-   [ ] inlier ratio
+-   [ ] match visualization
+
+## Phase 2 --- Illumination-Robust Representations
+
+-   [ ] representation abstraction
+-   [ ] CLAHE benchmark
+-   [ ] gradient magnitude
+-   [ ] local contrast
+-   [ ] Laplacian
+-   [ ] edge representation
+-   [ ] multi-scale representations
+-   [ ] phase congruency investigation
+-   [ ] shadow suppression investigation
+
+## Phase 3 --- Representation Benchmark
+
+-   [ ] fixed image-pair benchmark
+-   [ ] controlled illumination experiments
+-   [ ] RMSE comparison
+-   [ ] inlier-ratio comparison
+-   [ ] spatial-coverage comparison
+-   [ ] runtime comparison
+-   [ ] representation ranking
+
+## Phase 4 --- Adaptive Pair Analysis
+
+-   [ ] texture-strength analysis
+-   [ ] illumination-difference analysis
+-   [ ] scale-difference analysis
+-   [ ] geometric-difficulty analysis
+-   [ ] interpretable strategy selection
+
+## Phase 5 --- Alternative Correspondence
+
+-   [ ] SuperPoint
+-   [ ] learned matching
+-   [ ] LoFTR
+-   [ ] crater-based correspondence
+-   [ ] cross-sensor experiments
+
+## Phase 6 --- Terrain-Aware Geometry
+
+-   [ ] translation model
+-   [ ] similarity model
+-   [ ] affine model
+-   [ ] homography model
+-   [ ] residual-map analysis
+-   [ ] piecewise/grid registration
+-   [ ] model complexity penalty
+-   [ ] global-vs-local benchmark
+
+## Phase 7 --- High-Precision Registration
+
+-   [ ] local optimization
+-   [ ] sub-pixel refinement
+-   [ ] high-precision error evaluation
+-   [ ] spatially uniform control-point selection
+
+## Phase 8 --- Final Adaptive System
+
+-   [ ] end-to-end adaptive pipeline
+-   [ ] confidence estimation
+-   [ ] automated benchmarking
+-   [ ] real Chandrayaan-2 experiments
+-   [ ] cross-mission experiments
+-   [ ] reproducible result package
+-   [ ] final documentation
+
+------------------------------------------------------------------------
+
+# 🧪 Scientific Validation Rules
+
+This project should follow a strict distinction between:
+
+### Implemented
+
+Code exists and has been tested.
+
+### Experimental
+
+A method exists but its performance is still being evaluated.
+
+### Proposed
+
+A research direction has been designed but not implemented.
+
+### Demonstrated
+
+A method has been validated on a defined benchmark with reported
+results.
+
+Do **not** claim:
+
+-   illumination invariance,
+-   scale invariance,
+-   sub-pixel accuracy,
+-   terrain-aware superiority,
+-   or improvement over existing methods
+
+until the corresponding experiments demonstrate them.
+
+------------------------------------------------------------------------
+
+# 🔁 Reproducibility
+
+Every experiment should record:
+
+``` text
+Dataset
+Source sensor
+Reference sensor
+Image pair
+Preprocessing
+Representation
+Feature method
+Matcher
+Ratio threshold
+RANSAC method
+Geometric model
+Refinement method
+Metrics
+Runtime
+Random seed
+Software version
+```
+
+Results should be stored as machine-readable JSON/CSV files so that
+experiments can be compared later.
+
+------------------------------------------------------------------------
+
+# 📜 Data Policy
+
+Large scientific datasets should **not** be committed directly to Git.
+
+Keep:
+
+``` text
+data/
+```
+
+for local data and provide:
+
+-   dataset source,
+-   acquisition metadata,
+-   preprocessing instructions,
+-   expected directory structure,
+-   checksums where appropriate.
+
+The project should respect the license and redistribution conditions of
+every dataset, model and third-party dependency.
+
+------------------------------------------------------------------------
+
+# 📊 What Success Looks Like
+
+A successful final system should not simply say:
+
+``` text
+"Registration complete."
+```
+
+It should produce something closer to:
+
+``` text
+PAIR
+ ├── source: Chandrayaan-2 OHRC
+ ├── reference: LRO NAC
+ │
+ ▼
+PAIR ANALYSIS
+ ├── texture: medium
+ ├── illumination difference: high
+ └── spatial distortion: moderate
+ │
+ ▼
+SELECTED REPRESENTATION
+ └── gradient + local contrast
+ │
+ ▼
+CORRESPONDENCE
+ ├── candidates: ...
+ └── reliable matches: ...
+ │
+ ▼
+GEOMETRY
+ ├── global homography: insufficient
+ └── piecewise model: selected
+ │
+ ▼
+RESULT
+ ├── RMSE: measured experimentally
+ ├── inlier ratio: measured experimentally
+ ├── spatial coverage: measured experimentally
+ └── confidence: measured experimentally
+```
+
+The values must come from the actual experiment.
+
+------------------------------------------------------------------------
+
+# 🔭 Research Direction
+
+The long-term research hypothesis is:
+
+> **Lunar image registration can be made more robust by adapting the
+> representation, correspondence method, and geometric model to the
+> observable characteristics of the image pair rather than applying one
+> fixed registration pipeline to every pair.**
+
+This leads to three primary research questions:
+
+### RQ1 --- Representation
+
+**Which terrain-structure representation produces the most stable
+correspondences under lunar illumination changes?**
+
+### RQ2 --- Adaptation
+
+**Can observable pair characteristics predict which correspondence
+strategy is most reliable?**
+
+### RQ3 --- Geometry
+
+**When does a global geometric model fail on non-planar lunar terrain,
+and when does a piecewise model provide a meaningful improvement without
+overfitting?**
+
+------------------------------------------------------------------------
+
+# 🏆 Intended Contribution
+
+The intended contribution is therefore **not**:
+
+> "We implemented SIFT."
+
+Instead:
+
+> **We develop and evaluate an adaptive lunar image-registration
+> framework that treats illumination-robust representation selection,
+> correspondence strategy selection, and global-versus-local geometric
+> model selection as explicit parts of the registration problem.**
+
+SIFT, SuperPoint, LoFTR, RANSAC, homography and crater matching are
+components/baselines within that framework.
+
+------------------------------------------------------------------------
+
+# 📜 License
+
+This project is released under the **MIT License**.
+
+The MIT License applies to this project's original source code and
+documentation.
+
+It does **not** automatically grant rights to redistribute:
+
+-   Chandrayaan-2 data,
+-   LRO data,
+-   SELENE/Kaguya data,
+-   pretrained model weights,
+-   third-party libraries,
+-   or figures from external publications.
+
+Those materials remain subject to their respective licenses and usage
+conditions.
+
+See [`LICENSE`](LICENSE) for the full license text.
+
+------------------------------------------------------------------------
+
+# 🙏 Acknowledgements
+
+Developed as part of **Smart India Hackathon 2026** for the Indian Space
+Research Organisation (ISRO), Department of Space.
+
+**Problem Statement:** 26166
+
+The project builds on established work in computer vision, planetary
+image registration, lunar feature extraction, robust geometric
+estimation, and learned feature matching.
+
+------------------------------------------------------------------------
+
+# 📚 References
+
+1.  G. Troglio, J. Le Moigne, G. Moser, S. B. Serpico, and J. A.
+    Benediktsson, **"Automatic Extraction of Planetary Image
+    Features."**
+2.  P. Sidiropoulos and J.-P. Muller, **"A Systematic Solution to
+    Multi-Instrument Coregistration of High-Resolution Planetary Images
+    to an Orthorectified Baseline,"** IEEE TGRS, 2017. DOI:
+    `10.1109/TGRS.2017.2734693`.
+3.  Q. Yan, Y. Guo, and X. Zeng, **"Photometric-weighted invariant
+    feature transform for planetary surface image registration under
+    complex illumination,"** Aerospace Science and Technology, 2026.
+    DOI: `10.1016/j.ast.2026.113462`.
+4.  D. G. Lowe, **"Distinctive Image Features from Scale-Invariant
+    Keypoints,"** International Journal of Computer Vision, 2004. DOI:
+    `10.1023/B:VISI.0000029664.99615.94`.
+5.  D. DeTone, T. Malisiewicz, and A. Rabinovich, **"SuperPoint:
+    Self-Supervised Interest Point Detection and Description,"** CVPR
+    Workshops, 2018.
+6.  J. Sun, Z. Shen, Y. Wang, H. Bao, and X. Zhou, **"LoFTR:
+    Detector-Free Local Feature Matching with Transformers,"**
+    CVPR, 2021. DOI: `10.1109/CVPR46437.2021.00881`.
+7.  J. A. Christian, H. Derksen, and R. Watkins, **"Lunar Crater
+    Identification in Digital Images,"** Journal of the Astronautical
+    Sciences, 2021.
+8.  M. A. Fischler and R. C. Bolles, **"Random Sample Consensus: A
+    Paradigm for Model Fitting with Applications to Image Analysis and
+    Automated Cartography,"** Communications of the ACM, 1981. DOI:
+    `10.1145/358669.358692`.
+9.  R. Makharia, J. G. Singla, Amitabh, N. Dube, and H. Sharma,
+    **"Comparative Evaluation of Traditional and Deep Learning Feature
+    Matching Algorithms using Chandrayaan-2 Lunar Data,"** 2025.
+10. A. Kumar, S. Kaushal, and S. V. Murthy, **"MoonMetaSync: Lunar Image
+    Registration Analysis,"** 2024.
+
+------------------------------------------------------------------------
+
+## Project Status
+
+🚧 **In Development**
+
+The baseline registration system is being developed first. Advanced
+adaptive representation selection, terrain-aware local registration,
+crater-based matching, learned matching, and sub-pixel refinement will
+be introduced and validated incrementally.
+
+> **Build the baseline. Measure it. Break it. Improve it. Then prove the
+> improvement.**
