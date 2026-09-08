@@ -1,4 +1,4 @@
-# 🌕 Lunar Image Registration
+# Lunar Image Registration
 
 ### Adaptive, Illumination-Robust and Scale-Aware Image Correspondence for Chandrayaan-2 Optical Imagery
 
