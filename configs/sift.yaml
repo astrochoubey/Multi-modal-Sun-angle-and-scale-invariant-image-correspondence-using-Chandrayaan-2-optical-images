@@ -1,0 +1,47 @@
+# Lunar Image Registration - Classical SIFT Baseline Configuration
+version: "0.1.0"
+pipeline_name: "sift_baseline"
+
+preprocessing:
+  to_grayscale: true
+  percentile_normalization:
+    enabled: true
+    p_low: 1.0
+    p_high: 99.0
+  clahe:
+    enabled: true
+    clip_limit: 2.0
+    tile_grid_size: [8, 8]
+
+features:
+  method: "sift"
+  sift:
+    n_features: 5000
+    n_octave_layers: 4
+    contrast_threshold: 0.03
+    edge_threshold: 10.0
+    sigma: 1.6
+
+matching:
+  method: "ratio_test"
+  matcher_type: "BF"
+  distance_metric: "L2"
+  ratio_threshold: 0.75
+  cross_check: false
+
+geometry:
+  estimator: "USAC_MAGSAC"
+  model: "homography"
+  reprojection_threshold_px: 3.0
+  max_iterations: 10000
+  confidence: 0.999
+  spatial_coverage_grid:
+    enabled: true
+    grid_size: [8, 8]
+    min_coverage_ratio: 0.25
+
+outputs:
+  output_dir: "outputs"
+  save_matches_plot: true
+  save_registered_image: true
+  save_metrics_json: true

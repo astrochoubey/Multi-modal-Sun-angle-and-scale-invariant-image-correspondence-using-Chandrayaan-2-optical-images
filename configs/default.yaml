@@ -1,27 +1,74 @@
-# Default configuration for Phase 1 Lunar Image Registration Baseline
-feature_extraction:
-  method: "sift"
-  n_features: 5000
+# Lunar Image Registration - Default Configuration
+version: "0.1.0"
+pipeline_name: "default_pipeline"
 
+# Image Preprocessing & Radiometric Ingestion
 preprocessing:
+  to_grayscale: true
   grayscale: true
+  percentile_normalization:
+    enabled: true
+    p_low: 1.0
+    p_high: 99.0
   clahe:
     enabled: true
     clip_limit: 2.0
     tile_grid_size: [8, 8]
+  target_scale_normalization:
+    enabled: true
+    use_metadata_gsd: true
 
+# Feature Detection & Description
+features:
+  method: "sift"
+  sift:
+    n_features: 5000
+    n_octave_layers: 3
+    contrast_threshold: 0.04
+    edge_threshold: 10.0
+    sigma: 1.6
+
+feature_extraction:
+  method: "sift"
+  n_features: 5000
+
+# Feature Matching
 matching:
-  method: "bf"
+  method: "ratio_test"
+  matcher_type: "BF"        # Options: BF (BruteForce), FLANN
+  distance_metric: "L2"     # Options: L2, HAMMING
   norm: "L2"
   ratio_threshold: 0.75
+  cross_check: false
 
+# Geometric Consensus & Transformation
 geometry:
-  model: "homography"
+  estimator: "MAGSAC++"     # Options: RANSAC, USAC_MAGSAC, LMEDS
+  model: "homography"       # Options: homography, affine, partial_affine
+  reprojection_threshold_px: 5.0
   ransac:
     reprojection_threshold: 5.0
+  max_iterations: 10000
+  confidence: 0.999
+  spatial_coverage_grid:
+    enabled: true
+    grid_size: [8, 8]
+    min_coverage_ratio: 0.30
 
+# Sub-pixel Refinement
+refinement:
+  enabled: false
+  method: "matrix_dft"
+  patch_size: 32
+  upsample_factor: 20
+
+# Output Paths & Logging
 outputs:
+  output_dir: "outputs"
   base_dir: "outputs"
   matches_dir: "outputs/matches"
   registered_dir: "outputs/registered"
   metrics_dir: "outputs/metrics"
+  save_matches_plot: true
+  save_registered_image: true
+  save_metrics_json: true

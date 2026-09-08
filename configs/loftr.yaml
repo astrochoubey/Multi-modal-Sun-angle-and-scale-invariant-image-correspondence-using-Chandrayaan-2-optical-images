@@ -1,0 +1,49 @@
+# Lunar Image Registration - LoFTR Dense Transformer Configuration
+version: "0.1.0"
+pipeline_name: "loftr_dense"
+
+preprocessing:
+  to_grayscale: true
+  percentile_normalization:
+    enabled: true
+    p_low: 1.0
+    p_high: 99.0
+  clahe:
+    enabled: true
+    clip_limit: 2.0
+    tile_grid_size: [8, 8]
+  tile_sub_swaths:
+    enabled: true
+    tile_size: [640, 640]
+    overlap_px: 128
+
+features:
+  method: "loftr"
+  loftr:
+    weights: "outdoor"            # Pre-trained on MegaDepth
+    coarse_resolution: 8
+    fine_resolution: 2
+    match_threshold: 0.2
+    temp_bug_fix: false
+
+matching:
+  method: "dense_transformer"
+  dual_softmax: true
+  subpixel_refinement: true
+
+geometry:
+  estimator: "USAC_MAGSAC"
+  model: "homography"
+  reprojection_threshold_px: 3.0
+  max_iterations: 10000
+  confidence: 0.999
+  spatial_coverage_grid:
+    enabled: true
+    grid_size: [8, 8]
+    min_coverage_ratio: 0.35
+
+outputs:
+  output_dir: "outputs"
+  save_matches_plot: true
+  save_registered_image: true
+  save_metrics_json: true
