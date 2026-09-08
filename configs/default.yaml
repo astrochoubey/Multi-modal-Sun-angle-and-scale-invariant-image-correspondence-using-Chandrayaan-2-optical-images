@@ -1,0 +1,27 @@
+# Default configuration for Phase 1 Lunar Image Registration Baseline
+feature_extraction:
+  method: "sift"
+  n_features: 5000
+
+preprocessing:
+  grayscale: true
+  clahe:
+    enabled: true
+    clip_limit: 2.0
+    tile_grid_size: [8, 8]
+
+matching:
+  method: "bf"
+  norm: "L2"
+  ratio_threshold: 0.75
+
+geometry:
+  model: "homography"
+  ransac:
+    reprojection_threshold: 5.0
+
+outputs:
+  base_dir: "outputs"
+  matches_dir: "outputs/matches"
+  registered_dir: "outputs/registered"
+  metrics_dir: "outputs/metrics"
