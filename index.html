@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SOLACE </title>
+  <meta name="description" content="SOLACE: Sun-Angle & Optical Lunar Adaptive Correspondence Engine for Chandrayaan-2 optical sensors (OHRC, TMC-2, IIRS).">
+  
+  <!-- Premium Fonts: Space Grotesk, Chakra Petch, Inter, JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- AOS (Animate On Scroll) Library -->
+  <link rel="stylesheet" href="https://unpkg.com/aos@2.3.1/dist/aos.css">
+  
+  <!-- Main Mission Control Stylesheet -->
+  <link rel="stylesheet" href="/static/css/style.css">
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- Floating UI -->
+  <script src="https://cdn.jsdelivr.net/npm/@floating-ui/core@1.6.0/dist/floating-ui.core.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@floating-ui/dom@1.6.3/dist/floating-ui.dom.umd.min.js"></script>
+  
+  <!-- AOS Script -->
+  <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+</head>
+<body class="mission-control-theme">
+  <!-- Interactive Canvas Starfield and Cosmic Atmosphere -->
+  <canvas id="starfield-canvas" class="starfield-canvas"></canvas>
+  <div class="space-ambient-glow glow-cyan"></div>
+  <div class="space-ambient-glow glow-indigo"></div>
+  <div class="space-ambient-glow glow-amber"></div>
+
+  <!-- Top Aerospace Telemetry Header -->
+  <header class="mission-header" data-aos="fade-down" data-aos-duration="700">
+    <div class="header-inner">
+      
+      <!-- Brand & Mission Badge -->
+      <div class="mission-brand">
+        <div class="mission-crest-wrapper" data-tooltip="SOLACE · Sun-Angle & Optical Lunar Adaptive Correspondence Engine">
+          <div class="radar-sweep-ring"></div>
+          <div class="crest-core solace-core">
+            <svg class="solace-svg-logo" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <!-- Solar Corona Orbit Ring -->
+              <circle cx="16" cy="16" r="14" stroke="#F59E0B" stroke-width="1.2" stroke-dasharray="2 2.5" opacity="0.8"/>
+              <circle cx="16" cy="16" r="11" stroke="#00F0FF" stroke-width="1.2"/>
+              <!-- Lunar Crescent intersecting Sol -->
+              <path d="M16 6C10.477 6 6 10.477 6 16C6 21.523 10.477 26 16 26C13.2 23.5 11.5 19.9 11.5 16C11.5 12.1 13.2 8.5 16 6Z" fill="#00F0FF"/>
+              <!-- Central Optical Invariant Keypoint Star -->
+              <path d="M16 9.5L17.8 14.2L22.5 16L17.8 17.8L16 22.5L14.2 17.8L9.5 16L14.2 14.2L16 9.5Z" fill="#FFFFFF"/>
+              <circle cx="16" cy="16" r="1.8" fill="#0C1018"/>
+            </svg>
+          </div>
+        </div>
+
+        <div class="brand-text-block">
+          <div class="sub-agency-tag">
+            <span class="agency-callsign">ISRO // DEEP SPACE NETWORK</span>
+            <span class="separator-bullet">/</span>
+            <span class="payload-tag">CHANDRAYAAN-2 OPTICAL</span>
+            <span class="separator-bullet">/</span>
+            <span class="solace-badge-pill">SOLACE</span>
+          </div>
+          <h1 class="console-title"><span class="solace-brand-name">SOLACE</span> Lunar Registration Console</h1>
+        </div>
+      </div>
+
+      <!-- Live Flight Telemetry Status Bar -->
+      <div class="flight-telemetry-bar">
+        
+        <!-- Live Mission Clock -->
+        <div class="telemetry-pill clock-pill" data-tooltip="Orbital Mission Elapsed Time (UTC)">
+          <i data-lucide="clock" class="pill-icon"></i>
+          <div class="pill-data">
+            <span class="pill-label">MISSION UTC</span>
+            <span class="pill-value mono-val" id="mission-clock">--:--:-- UTC</span>
+          </div>
+        </div>
+
+        <!-- Lunar Sub-Solar Angle Indicator -->
+        <div class="telemetry-pill orbit-pill" data-tooltip="Simulated Sun Elevation Azimuth and Optical Orbit Ground Track">
+          <div class="moon-phase-mini" id="mini-moon-phase">
+            <div class="moon-disk">
+              <div class="moon-shadow"></div>
+            </div>
+          </div>
+          <div class="pill-data">
+            <span class="pill-label">SUN ELEVATION</span>
+            <span class="pill-value mono-val">38.4° OBLIQUE</span>
+          </div>
+        </div>
+
+        <!-- Sensor Health -->
+        <div class="telemetry-pill status-pill" data-tooltip="High-Resolution Optical Ingestion Pipeline Status">
+          <span class="radar-blip"></span>
+          <div class="pill-data">
+            <span class="pill-label">PIPELINE CORE</span>
+            <span class="pill-value status-active">ONLINE • SIFT+RANSAC</span>
+          </div>
+        </div>
+
+        <!-- Audio Telemetry Toggle -->
+        <button id="audio-toggle-btn" class="audio-hud-btn" data-tooltip="Toggle Mission Control Sound FX" aria-label="Toggle Mission Audio">
+          <i data-lucide="volume-2" id="audio-icon"></i>
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Telemetry Ticker Strip -->
+    <div class="telemetry-ticker-strip">
+      <div class="ticker-content">
+        <span class="ticker-item"><strong class="cyan">PRIMARY SENSORS:</strong> OHRC (0.25m GSD) • TMC-2 (5.0m STEREO)</span>
+        <span class="ticker-sep">■</span>
+        <span class="ticker-item"><strong class="emerald">GEOREFERENCING:</strong> SELENE/KAGUYA TC & LROC WAC FRAMEWORKS</span>
+        <span class="ticker-sep">■</span>
+        <span class="ticker-item"><strong class="indigo">TARGET REGION:</strong> DIOPHANTUS / TYCHO CRATER EJECTA BLANKET</span>
+        <span class="ticker-sep">■</span>
+        <span class="ticker-item"><strong class="amber">CONSTRAINTS:</strong> SUN-ANGLE ILLUMINATION & MULTI-GSD SCALE INVARIANCE</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Flight Operations Console -->
+  <main class="console-workspace">
+
+    <!-- TOP SECTION: Observation Pair Selection & Control Bay -->
+    <section class="hud-card mission-control-bay" data-aos="fade-up" data-aos-duration="600">
+      
+      <!-- Panel Header -->
+      <div class="hud-card-header">
+        <div class="hud-title-group">
+          <div class="hud-bracket left"></div>
+          <i data-lucide="layers" class="hud-icon cyan"></i>
+          <div>
+            <h2 class="hud-heading">Optical Observation Datasets</h2>
+            <p class="hud-subheading">Select calibrated real Chandrayaan-2 lunar optical imagery or ingest custom mission frames</p>
+          </div>
+          <div class="hud-bracket right"></div>
+        </div>
+
+        <button id="toggle-advanced-btn" class="hud-secondary-btn" data-tooltip="Configure feature extraction density, Lowe's ratio, and RANSAC threshold">
+          <i data-lucide="sliders" class="btn-icon-svg"></i>
+          <span id="advanced-label">Algorithm Parameters</span>
+          <i data-lucide="chevron-down" class="chevron-icon"></i>
+        </button>
+      </div>
+
+      <!-- Dataset Preset Deck (5 Mission Modes) -->
+      <div class="preset-selector-deck" id="preset-container">
+        
+        <button class="preset-card active" data-preset="primary" id="preset-primary" data-tooltip="Calibrated real Chandrayaan-2 full-aperture optical observation pair">
+          <div class="preset-status-indicator"></div>
+          <div class="preset-icon-box">
+            <i data-lucide="satellite" class="p-icon"></i>
+          </div>
+          <div class="preset-content">
+            <div class="preset-tag">MODE 01 // CALIBRATED REAL</div>
+            <strong class="preset-name">Chandrayaan-2 Primary Pair</strong>
+            <span class="preset-desc">Full optical resolution: real_source & real_reference</span>
+          </div>
+          <div class="preset-badge">REAL DATA</div>
+        </button>
+
+        <button class="preset-card" data-preset="illumination" id="preset-illumination" data-tooltip="Evaluates correspondence stability under acute Sun elevation lighting angle shifts">
+          <div class="preset-status-indicator"></div>
+          <div class="preset-icon-box">
+            <i data-lucide="sun-medium" class="p-icon"></i>
+          </div>
+          <div class="preset-content">
+            <div class="preset-tag">MODE 02 // ILLUMINATION SHIFT</div>
+            <strong class="preset-name">Sun-Angle Invariance</strong>
+            <span class="preset-desc">Solar elevation gradients & steep crater wall shadows</span>
+          </div>
+          <div class="preset-badge">SUN INVARIANT</div>
+        </button>
+
+        <button class="preset-card" data-preset="scale" id="preset-scale" data-tooltip="Cross-sensor spatial resolution mismatch between OHRC and TMC-2">
+          <div class="preset-status-indicator"></div>
+          <div class="preset-icon-box">
+            <i data-lucide="maximize-2" class="p-icon"></i>
+          </div>
+          <div class="preset-content">
+            <div class="preset-tag">MODE 03 // GSD MISMATCH</div>
+            <strong class="preset-name">Scale Invariance</strong>
+            <span class="preset-desc">Cross-sensor ground resolution (0.25m vs 5.0m GSD)</span>
+          </div>
+          <div class="preset-badge">MULTI-SCALE</div>
+        </button>
+
+        <button class="preset-card" data-preset="crater_crop" id="preset-crater" data-tooltip="High-resolution morphological evaluation around impact crater rims">
+          <div class="preset-status-indicator"></div>
+          <div class="preset-icon-box">
+            <i data-lucide="disc-3" class="p-icon"></i>
+          </div>
+          <div class="preset-content">
+            <div class="preset-tag">MODE 04 // MORPHOLOGY</div>
+            <strong class="preset-name">High-Res Crater Basin</strong>
+            <span class="preset-desc">Micro-crater ejecta morphology & structural rims</span>
+          </div>
+          <div class="preset-badge">BASIN FOCUS</div>
+        </button>
+
+        <button class="preset-card" data-preset="custom" id="preset-custom" data-tooltip="Upload your own lunar satellite imagery for registration">
+          <div class="preset-status-indicator"></div>
+          <div class="preset-icon-box">
+            <i data-lucide="upload-cloud" class="p-icon"></i>
+          </div>
+          <div class="preset-content">
+            <div class="preset-tag">MODE 05 // CUSTOM INGEST</div>
+            <strong class="preset-name">Custom Frame Ingestion</strong>
+            <span class="preset-desc">Drag & drop raw Chandrayaan / LROC / Kaguya imagery</span>
+          </div>
+          <div class="preset-badge">USER PAYLOAD</div>
+        </button>
+
+      </div>
+
+      <!-- Custom Ingest Dropzone Drawer -->
+      <div id="custom-upload-zone" class="upload-zone-container" style="display: none;">
+        <div class="upload-hud-target" id="drop-reference">
+          <input type="file" id="ref-file-input" accept="image/*" class="file-input-hidden">
+          <div class="upload-hud-reticle">
+            <i data-lucide="target" class="reticle-icon"></i>
+          </div>
+          <div class="upload-meta">
+            <span class="upload-slot-tag">TARGET FRAME 01</span>
+            <p class="upload-title">Reference Image (e.g. TMC-2 / Orthomap)</p>
+            <span class="upload-subtext">Click or drop geotiff, png, or jpg</span>
+            <span class="file-chosen-name" id="ref-chosen-name">No file selected</span>
+          </div>
+        </div>
+
+        <div class="upload-hud-target" id="drop-source">
+          <input type="file" id="src-file-input" accept="image/*" class="file-input-hidden">
+          <div class="upload-hud-reticle">
+            <i data-lucide="crosshair" class="reticle-icon"></i>
+          </div>
+          <div class="upload-meta">
+            <span class="upload-slot-tag">TARGET FRAME 02</span>
+            <p class="upload-title">Source Image (e.g. OHRC / Multi-Pass Frame)</p>
+            <span class="upload-subtext">Click or drop optical pass image</span>
+            <span class="file-chosen-name" id="src-chosen-name">No file selected</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Advanced Mathematical Hyperparameters Drawer -->
+      <div id="advanced-params-drawer" class="advanced-params-deck" style="display: none;">
+        
+        <div class="param-input-box" data-tooltip="Maximum number of scale-space octave features detected by SIFT">
+          <div class="param-top">
+            <label for="param-nfeatures">SIFT MAX KEYPOINTS</label>
+            <span class="param-live-val" id="val-nfeatures">5000</span>
+          </div>
+          <div class="range-wrapper">
+            <input type="range" id="param-nfeatures" min="1000" max="8000" step="500" value="5000">
+          </div>
+          <span class="param-hint">Dense coverage for rugged lunar crater rims</span>
+        </div>
+
+        <div class="param-input-box" data-tooltip="Lowe's nearest/second-nearest neighbor distance ratio for disambiguation">
+          <div class="param-top">
+            <label for="param-ratio">LOWE'S RATIO THRESHOLD</label>
+            <span class="param-live-val" id="val-ratio">0.75</span>
+          </div>
+          <div class="range-wrapper">
+            <input type="range" id="param-ratio" min="0.50" max="0.95" step="0.05" value="0.75">
+          </div>
+          <span class="param-hint">Rejects repetitive texture ambiguities</span>
+        </div>
+
+        <div class="param-input-box" data-tooltip="Maximum reprojection distance error allowed for inlier classification in RANSAC">
+          <div class="param-top">
+            <label for="param-ransac">RANSAC TOLERANCE (PX)</label>
+            <span class="param-live-val" id="val-ransac">5.0</span>
+          </div>
+          <div class="range-wrapper">
+            <input type="range" id="param-ransac" min="1.0" max="10.0" step="0.5" value="5.0">
+          </div>
+          <span class="param-hint">Sub-pixel geometric consensus bounds</span>
+        </div>
+
+        <div class="param-input-box" data-tooltip="Contrast Limited Adaptive Histogram Equalization clip limit for illumination equalization">
+          <div class="param-top">
+            <label for="param-clahe">CLAHE CONTRAST CLIP</label>
+            <span class="param-live-val" id="val-clahe">2.0</span>
+          </div>
+          <div class="range-wrapper">
+            <input type="range" id="param-clahe" min="1.0" max="6.0" step="0.5" value="2.0">
+          </div>
+          <span class="param-hint">Mitigates deep lunar crater shadows</span>
+        </div>
+
+      </div>
+
+      <!-- Execution Launch Bar -->
+      <div class="launch-action-bar">
+        
+        <div class="launch-btn-group">
+          <button id="run-btn" class="flight-launch-btn">
+            <span class="btn-glow-pulse"></span>
+            <span class="btn-spinner" id="btn-spinner" style="display: none;"></span>
+            <i data-lucide="play" id="btn-icon" class="launch-icon"></i>
+            <span id="btn-text">Execute Registration Pipeline</span>
+          </button>
+        </div>
+
+        <div class="pipeline-flow-monitor">
+          <div class="pipeline-step active" data-tooltip="Enhances local contrast while clipping extreme solar glints">
+            <span class="step-num">01</span>
+            <span class="step-label">CLAHE EQUALIZATION</span>
+          </div>
+          <div class="pipeline-step-arrow">→</div>
+          <div class="pipeline-step active" data-tooltip="Detects scale-space extrema and computes 128-dimensional orientation vectors">
+            <span class="step-num">02</span>
+            <span class="step-label">SIFT 128D DETECTOR</span>
+          </div>
+          <div class="pipeline-step-arrow">→</div>
+          <div class="pipeline-step active" data-tooltip="KNN search with Lowe's ratio test and mutual consistency check">
+            <span class="step-num">03</span>
+            <span class="step-label">KNN CORRESPONDENCE</span>
+          </div>
+          <div class="pipeline-step-arrow">→</div>
+          <div class="pipeline-step active" data-tooltip="Random Sample Consensus solves 3×3 projective homography matrix">
+            <span class="step-num">04</span>
+            <span class="step-label">RANSAC HOMOGRAPHY</span>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- MIDDLE SECTION: High-Precision Flight Telemetry Readouts -->
+    <section class="telemetry-hud-grid" data-aos="fade-up" data-aos-duration="600" data-aos-delay="100">
+      
+      <!-- Metric 1: Reprojection RMSE -->
+      <div class="telemetry-hud-card card-cyan" data-tooltip="Root Mean Square Error of transformed inlier feature points. Values < 1.5 px denote sub-pixel alignment accuracy.">
+        <div class="card-corner-bracket top-left"></div>
+        <div class="card-corner-bracket top-right"></div>
+        <div class="card-corner-bracket btm-left"></div>
+        <div class="card-corner-bracket btm-right"></div>
+
+        <div class="card-head">
+          <span class="card-sensor-tag">GEOMETRIC ACCURACY</span>
+          <i data-lucide="crosshair" class="hud-card-icon cyan"></i>
+        </div>
+        
+        <div class="card-metric-body">
+          <span class="metric-title">Reprojection RMSE</span>
+          <div class="metric-readout">
+            <span class="metric-number mono-display" id="metric-rmse">1.0708</span>
+            <span class="metric-unit-text">px</span>
+          </div>
+        </div>
+
+        <div class="card-foot">
+          <span class="hud-status-badge badge-cyan">
+            <i data-lucide="check-circle-2" class="badge-mini-icon"></i>
+            Sub-Pixel Target Met (&lt; 1.5 px)
+          </span>
+        </div>
+      </div>
+
+      <!-- Metric 2: RANSAC Inlier Ratio -->
+      <div class="telemetry-hud-card card-emerald" data-tooltip="Ratio of geometrically consistent matches accepted by RANSAC over total putative correspondences. High ratios (> 90%) confirm robust correspondence.">
+        <div class="card-corner-bracket top-left"></div>
+        <div class="card-corner-bracket top-right"></div>
+        <div class="card-corner-bracket btm-left"></div>
+        <div class="card-corner-bracket btm-right"></div>
+
+        <div class="card-head">
+          <span class="card-sensor-tag">CONSENSUS INTEGRITY</span>
+          <i data-lucide="shield-check" class="hud-card-icon emerald"></i>
+        </div>
+
+        <div class="card-metric-body">
+          <span class="metric-title">RANSAC Inlier Ratio</span>
+          <div class="metric-readout">
+            <span class="metric-number mono-display" id="metric-inlier-ratio">96.28</span>
+            <span class="metric-unit-text">%</span>
+          </div>
+        </div>
+
+        <div class="card-foot">
+          <div class="inlier-breakdown">
+            <span class="inlier-label">Inliers:</span>
+            <strong id="metric-inliers" class="emerald">570</strong>
+            <span class="inlier-divider">/</span>
+            <span class="inlier-total" id="metric-matches">592 matches</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Metric 3: Feature Density -->
+      <div class="telemetry-hud-card card-indigo" data-tooltip="Total invariant scale-space keypoint descriptors extracted across source and reference lunar terrain frames.">
+        <div class="card-corner-bracket top-left"></div>
+        <div class="card-corner-bracket top-right"></div>
+        <div class="card-corner-bracket btm-left"></div>
+        <div class="card-corner-bracket btm-right"></div>
+
+        <div class="card-head">
+          <span class="card-sensor-tag">DESCRIPTORS EXTRACTED</span>
+          <i data-lucide="sparkles" class="hud-card-icon indigo"></i>
+        </div>
+
+        <div class="card-metric-body">
+          <span class="metric-title">Total Keypoints</span>
+          <div class="metric-readout">
+            <span class="metric-number mono-display" id="metric-keypoints">10,000</span>
+            <span class="metric-unit-text">pts</span>
+          </div>
+        </div>
+
+        <div class="card-foot">
+          <div class="inlier-breakdown">
+            <span>Src: <strong id="metric-src-kp">5,000</strong></span>
+            <span class="inlier-divider">•</span>
+            <span>Ref: <strong id="metric-ref-kp">5,000</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Metric 4: Computation Latency -->
+      <div class="telemetry-hud-card card-amber" data-tooltip="End-to-end processing execution time for preprocessing, feature detection, descriptor computation, matching, and perspective transformation.">
+        <div class="card-corner-bracket top-left"></div>
+        <div class="card-corner-bracket top-right"></div>
+        <div class="card-corner-bracket btm-left"></div>
+        <div class="card-corner-bracket btm-right"></div>
+
+        <div class="card-head">
+          <span class="card-sensor-tag">SYSTEM VELOCITY</span>
+          <i data-lucide="zap" class="hud-card-icon amber"></i>
+        </div>
+
+        <div class="card-metric-body">
+          <span class="metric-title">Pipeline Latency</span>
+          <div class="metric-readout">
+            <span class="metric-number mono-display" id="metric-latency">480</span>
+            <span class="metric-unit-text">ms</span>
+          </div>
+        </div>
+
+        <div class="card-foot">
+          <span class="hud-status-badge badge-amber">
+            <i data-lucide="cpu" class="badge-mini-icon"></i>
+            Real-Time Edge CPU Exec
+          </span>
+        </div>
+      </div>
+
+    </section>
+
+    <!-- BOTTOM SECTION: Multi-Spectral Optical Visualization Bay -->
+    <section class="hud-card visualization-studio-card" data-aos="fade-up" data-aos-duration="600" data-aos-delay="200">
+      
+      <!-- Studio Control Bar -->
+      <div class="studio-header">
+        
+        <!-- Tab Selectors -->
+        <div class="studio-tabs" role="tablist">
+          
+          <button class="vis-tab active" data-tab="split" role="tab" data-tooltip="Interactive split curtain slider comparing reference and registered lunar imagery">
+            <i data-lucide="split" class="tab-icon"></i>
+            <span>Curtain Swipe</span>
+          </button>
+
+          <button class="vis-tab" data-tab="matches" role="tab" data-tooltip="Geometric correspondence vectors connecting verified crater landmarks">
+            <i data-lucide="git-commit" class="tab-icon"></i>
+            <span>Feature Matches</span>
+          </button>
+
+          <button class="vis-tab" data-tab="checkerboard" role="tab" data-tooltip="Alternating 8×8 tiles showing crater boundary alignment">
+            <i data-lucide="grid" class="tab-icon"></i>
+            <span>Checkerboard</span>
+          </button>
+
+          <button class="vis-tab" data-tab="difference" role="tab" data-tooltip="Inferno colormap highlighting residual photometric difference from Sun angle shifts">
+            <i data-lucide="flame" class="tab-icon"></i>
+            <span>Difference Heatmap</span>
+          </button>
+
+          <button class="vis-tab" data-tab="blend" role="tab" data-tooltip="Continuous opacity alpha-blending slider">
+            <i data-lucide="blend" class="tab-icon"></i>
+            <span>Alpha Blend</span>
+          </button>
+
+        </div>
+
+        <!-- Studio Quick Toolbar -->
+        <div class="studio-quick-tools">
+          
+          <!-- Live Cursor Reticle Readout -->
+          <div class="surface-telemetry-hud" id="surface-hud">
+            <span class="hud-coord-item">X: <strong id="hud-coord-x" class="cyan">000</strong></span>
+            <span class="hud-coord-item">Y: <strong id="hud-coord-y" class="cyan">000</strong></span>
+            <span class="hud-coord-item">REFLECTANCE: <strong id="hud-coord-val" class="emerald">0.82</strong></span>
+          </div>
+
+          <!-- Save Output Action -->
+          <button id="download-reg-btn" class="hud-secondary-btn" data-tooltip="Save calibrated registered high-resolution lunar image">
+            <i data-lucide="download" class="btn-icon-svg"></i>
+            <span>Save Output</span>
+          </button>
+
+        </div>
+
+      </div>
+
+      <!-- Main Visualizer Viewport -->
+      <div class="visualizer-viewport-wrapper">
+        
+        <!-- HUD Corner Overlay Accents -->
+        <div class="viewport-hud-bracket top-left"></div>
+        <div class="viewport-hud-bracket top-right"></div>
+        <div class="viewport-hud-bracket btm-left"></div>
+        <div class="viewport-hud-bracket btm-right"></div>
+
+        <!-- Lunar Scale Bar & Sun Vector HUD elements -->
+        <div class="viewport-overlay-elements">
+          <div class="lunar-scale-bar" data-tooltip="Ground Sampling Distance spatial reference">
+            <div class="scale-ticks">
+              <span class="tick"></span>
+              <span class="tick-line"></span>
+              <span class="tick"></span>
+            </div>
+            <span class="scale-label">250 METERS</span>
+          </div>
+
+          <div class="sun-vector-widget" data-tooltip="Sub-solar illumination vector azimuth">
+            <div class="sun-compass-ring">
+              <div class="sun-arrow-pivot" style="transform: rotate(38deg);">
+                <span class="sun-arrow"></span>
+              </div>
+            </div>
+            <span class="sun-label">SUN 38° AZ</span>
+          </div>
+        </div>
+
+        <!-- VIEW PANEL 1: Interactive Split Curtain View -->
+        <div class="view-panel active" id="panel-split">
+          <div class="split-container" id="split-wrapper">
+            <img id="img-reference-bottom" src="" alt="Chandrayaan-2 Reference Image" class="split-img base-layer">
+            <div class="split-overlay-wrapper" id="split-overlay">
+              <img id="img-registered-top" src="" alt="Registered Lunar Image" class="split-img top-layer">
+            </div>
+            <div class="split-divider" id="split-handle">
+              <div class="handle-thumb">
+                <i data-lucide="chevrons-left-right" class="thumb-icon"></i>
+              </div>
+            </div>
+            <div class="layer-pill pill-left">
+              <i data-lucide="orbit" class="layer-pill-icon"></i>
+              <span>Reference Image (Chandrayaan-2)</span>
+            </div>
+            <div class="layer-pill pill-right">
+              <i data-lucide="satellite" class="layer-pill-icon"></i>
+              <span>Registered Source (Projected)</span>
+            </div>
+          </div>
+          <div class="view-helper-bar">
+            <i data-lucide="info" class="helper-icon"></i>
+            <span>Interactive Multi-Aperture Curtain: Drag central handle horizontally to inspect crater rim alignment across illumination boundaries.</span>
+          </div>
+        </div>
+
+        <!-- VIEW PANEL 2: Correspondences View -->
+        <div class="view-panel" id="panel-matches">
+          <div class="image-frame">
+            <img id="img-matches" src="" alt="Feature Correspondences" class="fit-image">
+          </div>
+          <div class="view-helper-bar">
+            <i data-lucide="info" class="helper-icon"></i>
+            <span>Geometrically verified RANSAC inlier correspondences (green vectors) matching invariant lunar crater morphology.</span>
+          </div>
+        </div>
+
+        <!-- VIEW PANEL 3: Checkerboard Alignment View -->
+        <div class="view-panel" id="panel-checkerboard">
+          <div class="image-frame">
+            <img id="img-checkerboard" src="" alt="Checkerboard Grid" class="fit-image">
+          </div>
+          <div class="view-helper-bar">
+            <i data-lucide="info" class="helper-icon"></i>
+            <span>Alternating 8×8 tiles between Reference and Registered imagery to verify seamless edge continuity across crater borders.</span>
+          </div>
+        </div>
+
+        <!-- VIEW PANEL 4: Difference Heatmap View -->
+        <div class="view-panel" id="panel-difference">
+          <div class="image-frame">
+            <img id="img-difference" src="" alt="Photometric Difference Heatmap" class="fit-image">
+          </div>
+          <div class="view-helper-bar">
+            <i data-lucide="info" class="helper-icon"></i>
+            <span>Inferno spectrum mapping: highlights illumination disparities caused by Sun angle changes while confirming zero geometric drift.</span>
+          </div>
+        </div>
+
+        <!-- VIEW PANEL 5: Alpha Blend View -->
+        <div class="view-panel" id="panel-blend">
+          <div class="blend-deck-controls">
+            <div class="blend-control-header">
+              <span class="blend-title">SPECTRAL OPACITY CROSS-FADE</span>
+              <span id="blend-val" class="blend-ratio-readout">50% Ref / 50% Reg</span>
+            </div>
+            <div class="blend-slider-wrapper">
+              <span class="blend-end-label">REFERENCE</span>
+              <input type="range" id="blend-slider" min="0" max="100" value="50">
+              <span class="blend-end-label">REGISTERED</span>
+            </div>
+          </div>
+          <div class="blend-container">
+            <img id="img-blend-ref" src="" alt="Reference Image Blend" class="blend-layer blend-base">
+            <img id="img-blend-reg" src="" alt="Registered Image Blend" class="blend-layer blend-top" style="opacity: 0.5;">
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+
+    <!-- Homography Matrix Flight Deck Accordion -->
+    <section class="hud-card matrix-deck" data-aos="fade-up" data-aos-duration="600" data-aos-delay="250">
+      <details class="matrix-accordion" open>
+        <summary class="matrix-summary">
+          <div class="matrix-title-group">
+            <i data-lucide="matrix" class="matrix-icon"></i>
+            <span class="matrix-heading">Projective 3×3 Homography Matrix $(\mathbf{H})$</span>
+          </div>
+          <div class="matrix-badges">
+            <span class="matrix-badge"><i data-lucide="shield-check" class="badge-mini-icon"></i> RANSAC Solved</span>
+            <button type="button" class="copy-matrix-btn" id="copy-matrix-btn" data-tooltip="Copy 3×3 matrix to clipboard">
+              <i data-lucide="copy" class="btn-icon-svg"></i>
+              <span>Copy Matrix</span>
+            </button>
+          </div>
+        </summary>
+        <div class="matrix-content">
+          <pre id="matrix-display" class="matrix-code">Loading transformation matrix telemetry...</pre>
+          <div class="matrix-legend">
+            <span>Transformation: 8-DOF Projective Planar Homography • $[\mathbf{x}' \sim \mathbf{H}\mathbf{x}]$ mapping source pixels into reference coordinates</span>
+          </div>
+        </div>
+      </details>
+    </section>
+
+  </main>
+
+  <!-- Mission Footer -->
+  <footer class="mission-footer" data-aos="fade-up" data-aos-duration="700">
+    <div class="footer-inner">
+      <div class="footer-left">
+        <span class="footer-brand">CHANDRAYAAN-2 LUNAR OPTICAL REGISTRATION ENGINE</span>
+        <span class="footer-copyright">Autonomous Multi-Modal Correspondence Pipeline • Invariant to Solar Angle & Resolution Mismatch</span>
+      </div>
+      <div class="footer-right">
+        <span class="engine-ver">SYSTEM RELEASE v2.4.0 • PRODUCTION GRADE</span>
+        <span class="dot-sep">•</span>
+        <span class="flight-ready">FLIGHT READY</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Notification Toast -->
+  <div id="toast" class="toast-hud"></div>
+
+  <!-- Floating UI Custom Tooltip Anchor -->
+  <div id="global-floating-tooltip" class="floating-hud-tooltip"></div>
+
+  <!-- Main JavaScript App -->
+  <script src="/static/js/app.js"></script>
+</body>
+</html>

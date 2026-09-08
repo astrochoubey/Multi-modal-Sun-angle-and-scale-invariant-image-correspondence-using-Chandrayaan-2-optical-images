@@ -1,22 +1,13 @@
 {
-  "version": 2,
   "cleanUrls": true,
   "rewrites": [
     {
       "source": "/static/(.*)",
-      "destination": "/web/$1"
-    },
-    {
-      "source": "/data/(.*)",
-      "destination": "/web/data/$1"
-    },
-    {
-      "source": "/",
-      "destination": "/web/index.html"
+      "destination": "/static/$1"
     },
     {
       "source": "/(.*)",
-      "destination": "/web/$1"
+      "destination": "/index.html"
     }
   ]
 }
