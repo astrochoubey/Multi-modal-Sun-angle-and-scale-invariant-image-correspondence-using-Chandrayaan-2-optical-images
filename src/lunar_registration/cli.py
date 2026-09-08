@@ -202,8 +202,8 @@ def run_adaptive_command(args):
     out_dir = Path(args.output_dir)
 
     result = adaptive_register_images(
-        source_path=source_path,
-        reference_path=reference_path,
+        source=source_path,
+        reference=reference_path,
         output_dir=out_dir,
         gsd_source=args.gsd_source,
         gsd_reference=args.gsd_reference,

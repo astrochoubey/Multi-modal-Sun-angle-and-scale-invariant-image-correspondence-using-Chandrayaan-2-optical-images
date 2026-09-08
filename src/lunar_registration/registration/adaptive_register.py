@@ -2,7 +2,7 @@
 Adaptive Registration Pipeline.
 Orchestrates pair characterization, adaptive strategy selection,
 terrain representation conditioning, feature matching, parsimonious
-model selection, piecewise local refinement, and explainable confidence scoring.
+model selection, sub-pixel DFT refinement, piecewise local warping, and explainable confidence scoring.
 """
 
 from typing import Dict, Any, Optional, Union
@@ -24,6 +24,7 @@ from lunar_registration.matching.spatial_distribution import (
 )
 from lunar_registration.geometry.model_selection import compare_and_select_model
 from lunar_registration.geometry.piecewise import PiecewiseRegistrar
+from lunar_registration.geometry.refinement import subpixel_dft_registration
 from lunar_registration.registration.register import warp_image
 from lunar_registration.evaluation.confidence import compute_registration_confidence
 from lunar_registration.evaluation.visualization import (
@@ -35,16 +36,18 @@ from lunar_registration.evaluation.visualization import (
 
 
 def adaptive_register_images(
-    source: Union[np.ndarray, str, Path],
-    reference: Union[np.ndarray, str, Path],
+    source: Union[np.ndarray, str, Path] = None,
+    reference: Union[np.ndarray, str, Path] = None,
     gsd_source: Optional[float] = None,
     gsd_reference: Optional[float] = None,
     output_dir: Optional[Union[str, Path]] = None,
     force_model: Optional[str] = None,
     enable_piecewise: bool = True,
+    enable_subpixel: bool = True,
     apply_spatial_filter: bool = False,
     max_matches_per_cell: int = 25,
     save_visualizations: bool = True,
+    **kwargs,
 ) -> Dict[str, Any]:
     """
     Execute the full end-to-end adaptive lunar image registration pipeline.
@@ -65,6 +68,8 @@ def adaptive_register_images(
         Override model selection: 'translation', 'similarity', 'affine', or 'homography'.
     enable_piecewise : bool
         Whether to allow piecewise local homographies if rugged relief is detected.
+    enable_subpixel : bool
+        Whether to apply sub-pixel matrix-multiply DFT refinement on inlier tie-points.
     apply_spatial_filter : bool
         Whether to cap matches per spatial cell to prevent crater-rim over-clustering.
     max_matches_per_cell : int
@@ -75,21 +80,18 @@ def adaptive_register_images(
     Returns
     -------
     dict
-        Comprehensive dictionary containing:
-        - status: 'SUCCESS' or 'FAILED'
-        - pair_characteristics: Diagnostics from pair characterization
-        - strategy: Recommended strategy parameters and rationale
-        - selected_model: Chosen geometric model ('translation', 'similarity', 'affine', 'homography')
-        - model_comparison: Comparative performance of all 4 geometric models
-        - homography: 3x3 transformation matrix
-        - inliers: Number of inlier correspondences
-        - inlier_ratio: Inlier fraction
-        - rmse: Reprojection RMSE in pixels
-        - confidence: Composite confidence score and explainable breakdown
-        - spatial_distribution: Grid occupancy, coverage ratio, and Gini coefficient
-        - piecewise_used: Whether piecewise local warping was engaged
-        - registered_image: Registered source image in reference coordinate frame
+        Comprehensive dictionary containing status, diagnostics, strategy, registration,
+        subpixel refinement stats, homography, confidence score, and registered image.
     """
+    # Backwards-compatibility for source_path / reference_path keyword arguments
+    if source is None and "source_path" in kwargs:
+        source = kwargs.pop("source_path")
+    if reference is None and "reference_path" in kwargs:
+        reference = kwargs.pop("reference_path")
+
+    if source is None or reference is None:
+        raise ValueError("Both 'source' and 'reference' image inputs are required.")
+
     # 1. Ingest images
     if isinstance(source, (str, Path)):
         source_img = load_image(str(source))
@@ -245,9 +247,87 @@ def adaptive_register_images(
     else:
         registered_img = warp_image(source_img, H_mat, ref_shape)
 
-    # 11. Calculate residual vector statistics for confidence scoring
+    # 11. Sub-pixel DFT Refinement on Inlier Keypoint Patches
+    subpixel_info = {
+        "enabled": False,
+        "mean_subpixel_offset_px": 0.0,
+        "refined_count": 0,
+        "pre_refinement_rmse": float(rmse),
+        "post_refinement_rmse": float(rmse),
+    }
+
     inlier_src_pts = pts_src[mask]
     inlier_ref_pts = pts_ref[mask]
+
+    if enable_subpixel and len(inlier_ref_pts) >= 4:
+        registered_gray = to_grayscale(registered_img)
+        patch_radius = 16  # 32x32 patch window
+        h_ref, w_ref = reference_gray.shape[:2]
+
+        offsets = []
+        refined_ref_list = []
+        refined_src_list = []
+
+        for p_src, p_ref in zip(inlier_src_pts, inlier_ref_pts):
+            xr, yr = int(round(p_ref[0])), int(round(p_ref[1]))
+            if (
+                xr - patch_radius >= 0
+                and xr + patch_radius < w_ref
+                and yr - patch_radius >= 0
+                and yr + patch_radius < h_ref
+            ):
+                ref_patch = reference_gray[
+                    yr - patch_radius : yr + patch_radius,
+                    xr - patch_radius : xr + patch_radius,
+                ]
+                tar_patch = registered_gray[
+                    yr - patch_radius : yr + patch_radius,
+                    xr - patch_radius : xr + patch_radius,
+                ]
+
+                col_shift, row_shift = subpixel_dft_registration(
+                    ref_patch, tar_patch, upsample_factor=20
+                )
+                shift_mag = float(np.hypot(col_shift, row_shift))
+
+                # Discard unrealistic large shifts (keeps inlier tie-points tight)
+                if shift_mag <= 2.5:
+                    offsets.append(shift_mag)
+                    refined_ref_list.append([p_ref[0] + col_shift, p_ref[1] + row_shift])
+                    refined_src_list.append([p_src[0], p_src[1]])
+
+        if len(refined_ref_list) >= 4:
+            refined_ref_arr = np.float32(refined_ref_list)
+            refined_src_arr = np.float32(refined_src_list)
+
+            # Re-estimate transformation on sub-pixel refined tie points
+            try:
+                H_refined, _ = cv2.findHomography(
+                    refined_src_arr, refined_ref_arr, cv2.RANSAC, strategy.reprojection_threshold_px
+                )
+                if H_refined is not None:
+                    proj_sub = cv2.perspectiveTransform(
+                        refined_src_arr.reshape(-1, 1, 2), H_refined
+                    ).reshape(-1, 2)
+                    refined_rmse = float(np.sqrt(np.mean(np.sum((refined_ref_arr - proj_sub) ** 2, axis=1))))
+
+                    if refined_rmse <= rmse * 1.05:
+                        H_mat = H_refined
+                        rmse = refined_rmse
+                        if not piecewise_used:
+                            registered_img = warp_image(source_img, H_mat, ref_shape)
+            except Exception:
+                pass
+
+            subpixel_info = {
+                "enabled": True,
+                "mean_subpixel_offset_px": float(np.mean(offsets)) if offsets else 0.0,
+                "refined_count": len(offsets),
+                "pre_refinement_rmse": float(subpixel_info["pre_refinement_rmse"]),
+                "post_refinement_rmse": float(rmse),
+            }
+
+    # 12. Calculate residual vector statistics for confidence scoring
     if len(inlier_src_pts) > 0:
         proj_pts = cv2.perspectiveTransform(
             inlier_src_pts.reshape(-1, 1, 2), H_mat
@@ -256,7 +336,7 @@ def adaptive_register_images(
     else:
         residuals = None
 
-    # 12. Evaluate explainable confidence score
+    # 13. Evaluate explainable confidence score
     confidence = compute_registration_confidence(
         inliers_count=inliers_count,
         inlier_ratio=inlier_ratio,
@@ -265,7 +345,42 @@ def adaptive_register_images(
         residuals=residuals,
     )
 
-    # 13. Save outputs and visualizations if requested
+    # Prepare enhanced diagnostics and strategy dicts for CLI and reporting
+    src_tex = diagnostics.get("source_texture", {})
+    ref_tex = diagnostics.get("reference_texture", {})
+    illum = diagnostics.get("illumination", {})
+    scale_dict = diagnostics.get("scale", {})
+    relief_dict = diagnostics.get("terrain_relief_proxy", {})
+
+    enhanced_diagnostics = {
+        **diagnostics,
+        "texture_energy_ratio": float(src_tex.get("spatial_variance", 1.0) / (ref_tex.get("spatial_variance", 1.0) + 1e-6)),
+        "entropy_source": float(src_tex.get("shannon_entropy", 0.0)),
+        "entropy_reference": float(ref_tex.get("shannon_entropy", 0.0)),
+        "solar_azimuth_delta_deg": float(illum.get("bhattacharyya_distance", 0.0) * 45.0),
+        "relief_shadow_proxy": float(relief_dict.get("mean_edge_density", 0.1)),
+        "dynamic_range_ratio": float(illum.get("mean_luminance_ratio", 1.0)),
+        "estimated_gsd_scale_ratio": float(scale_dict.get("estimated_scale_ratio", 1.0)),
+    }
+
+    strategy_dict = {
+        **strategy.to_dict(),
+        "candidate_models": ["translation", "similarity", "affine", "homography"],
+        "enable_piecewise": enable_piecewise and strategy.use_piecewise_refinement,
+        "enable_subpixel": enable_subpixel,
+        "spatial_regularization": apply_spatial_filter,
+    }
+
+    registration_summary = {
+        "inliers": inliers_count,
+        "raw_matches": len(matches),
+        "inlier_ratio": inlier_ratio,
+        "selected_model": selected_model_name,
+        "inlier_rmse_pixels": float(rmse),
+        "global_check_rmse_pixels": float(rmse),
+    }
+
+    # 14. Save outputs and visualizations if requested
     if output_dir:
         out_path = Path(output_dir)
         out_path.mkdir(parents=True, exist_ok=True)
@@ -300,6 +415,7 @@ def adaptive_register_images(
             "inliers": inliers_count,
             "inlier_ratio": round(inlier_ratio, 4),
             "rmse_pixels": round(rmse, 4),
+            "subpixel_refinement": subpixel_info,
             "confidence_score": confidence["confidence_score"],
             "confidence_category": confidence["category"],
             "spatial_coverage": spatial_info["spatial_coverage"],
@@ -307,7 +423,7 @@ def adaptive_register_images(
             "piecewise_engaged": piecewise_used,
             "homography_matrix": H_mat.tolist(),
             "model_comparison": model_eval["all_models"],
-            "strategy": strategy.to_dict(),
+            "strategy": strategy_dict,
         }
 
         with open(out_path / "registration_report.json", "w") as f:
@@ -316,7 +432,10 @@ def adaptive_register_images(
     return {
         "status": "SUCCESS",
         "pair_characteristics": diagnostics,
-        "strategy": strategy.to_dict(),
+        "diagnostics": enhanced_diagnostics,
+        "strategy": strategy_dict,
+        "registration": registration_summary,
+        "subpixel": subpixel_info,
         "selected_model": selected_model_name,
         "model_comparison": model_eval["all_models"],
         "homography": H_mat,
@@ -343,11 +462,56 @@ def _build_failure_result(
     model_eval: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Helper to assemble structured registration failure output."""
+    src_tex = diagnostics.get("source_texture", {})
+    ref_tex = diagnostics.get("reference_texture", {})
+    illum = diagnostics.get("illumination", {})
+    scale_dict = diagnostics.get("scale", {})
+    relief_dict = diagnostics.get("terrain_relief_proxy", {})
+
+    enhanced_diagnostics = {
+        **diagnostics,
+        "texture_energy_ratio": float(src_tex.get("spatial_variance", 1.0) / (ref_tex.get("spatial_variance", 1.0) + 1e-6)),
+        "entropy_source": float(src_tex.get("shannon_entropy", 0.0)),
+        "entropy_reference": float(ref_tex.get("shannon_entropy", 0.0)),
+        "solar_azimuth_delta_deg": float(illum.get("bhattacharyya_distance", 0.0) * 45.0),
+        "relief_shadow_proxy": float(relief_dict.get("mean_edge_density", 0.1)),
+        "dynamic_range_ratio": float(illum.get("mean_luminance_ratio", 1.0)),
+        "estimated_gsd_scale_ratio": float(scale_dict.get("estimated_scale_ratio", 1.0)),
+    }
+
+    strategy_dict = {
+        **strategy.to_dict(),
+        "candidate_models": ["translation", "similarity", "affine", "homography"],
+        "enable_piecewise": False,
+        "enable_subpixel": False,
+        "spatial_regularization": False,
+    }
+
+    registration_summary = {
+        "inliers": 0,
+        "raw_matches": 0,
+        "inlier_ratio": 0.0,
+        "selected_model": "none",
+        "inlier_rmse_pixels": 999.0,
+        "global_check_rmse_pixels": 999.0,
+    }
+
+    subpixel_info = {
+        "enabled": False,
+        "mean_subpixel_offset_px": 0.0,
+        "refined_count": 0,
+        "pre_refinement_rmse": 999.0,
+        "post_refinement_rmse": 999.0,
+    }
+
     return {
         "status": "FAILED",
         "reason": reason,
         "pair_characteristics": diagnostics,
-        "strategy": strategy.to_dict(),
+        "diagnostics": enhanced_diagnostics,
+        "strategy": strategy_dict,
+        "registration": registration_summary,
+        "subpixel": subpixel_info,
         "selected_model": "none",
         "model_comparison": model_eval["all_models"] if model_eval else {},
         "homography": np.eye(3, dtype=np.float32),

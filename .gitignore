@@ -36,3 +36,9 @@ outputs/*
 *.egg-info/
 dist/
 build/
+
+# Pretrained model weights
+models/weights/*
+*.pth
+*.ckpt
+*.onnx
