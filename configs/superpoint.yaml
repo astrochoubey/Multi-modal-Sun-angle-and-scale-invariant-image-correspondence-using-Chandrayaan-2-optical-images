@@ -1,0 +1,54 @@
+# Lunar Image Registration - SuperPoint + LightGlue Configuration
+version: "0.1.0"
+pipeline_name: "superpoint_lightglue"
+
+preprocessing:
+  to_grayscale: true
+  percentile_normalization:
+    enabled: true
+    p_low: 1.0
+    p_high: 99.0
+  clahe:
+    enabled: true
+    clip_limit: 2.0
+    tile_grid_size: [8, 8]
+
+features:
+  method: "superpoint"
+  superpoint:
+    max_keypoints: 2048
+    keypoint_threshold: 0.005
+    nms_radius: 4
+    remove_borders: 4
+
+matching:
+  method: "lightglue"
+  lightglue:
+    filter_threshold: 0.1
+    flash: true
+    checkpoint: "superpoint"
+    depth_confidence: 0.95
+    width_confidence: 0.99
+
+geometry:
+  estimator: "USAC_MAGSAC"
+  model: "homography"
+  reprojection_threshold_px: 3.0
+  max_iterations: 10000
+  confidence: 0.999
+  spatial_coverage_grid:
+    enabled: true
+    grid_size: [8, 8]
+    min_coverage_ratio: 0.35
+
+refinement:
+  enabled: true
+  method: "matrix_dft"
+  patch_size: 32
+  upsample_factor: 20
+
+outputs:
+  output_dir: "outputs"
+  save_matches_plot: true
+  save_registered_image: true
+  save_metrics_json: true
