@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "cleanUrls": true,
+  "public": false,
+  "rewrites": [
+    {
+      "source": "/static/(.*)",
+      "destination": "/web/$1"
+    },
+    {
+      "source": "/data/(.*)",
+      "destination": "/web/data/$1"
+    },
+    {
+      "source": "/",
+      "destination": "/web/index.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/web/$1"
+    }
+  ]
+}
